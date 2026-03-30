@@ -53,6 +53,38 @@ function App() {
 
   const riskPeriods = getDangerousPeriods(forecast);
 
+  const handleCitySearch = (e) => {
+    if (e.key === "Enter" && e.target.value.trim() !== "") {
+      setCity(e.target.value.trim());
+    }
+  };
+
+  const renderNavbar = () => (
+    <header className="navbar">
+      <div className="nav-title">☰ Port Weather Assist</div>
+
+      <input
+        className="search"
+        type="text"
+        placeholder="Search location..."
+        defaultValue={city}
+        onKeyDown={handleCitySearch}
+      />
+
+      <div className="nav-right">
+        <div className="datetime">{currentTime.toLocaleString()}</div>
+
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+        >
+          {theme === "dark" ? "Light mode" : "Dark mode"}
+        </button>
+      </div>
+    </header>
+  );
+
   useEffect(() => {
     localStorage.setItem("lastCity", city);
   }, [city]);
@@ -98,8 +130,9 @@ function App() {
       });
     } catch (err) {
       console.error("Weather fetch error:", err);
-      setError("Something went wrong while loading weather.");
-      setWeather(null);
+      setError("Location not found. Please try another city.");
+      // Keep previous weather data instead of clearing the page:
+      // setWeather(null);
     }
   }, [city]);
 
@@ -201,51 +234,22 @@ function App() {
     loadTide(weather.lat, weather.lon);
   }, [weather?.lat, weather?.lon, loadTide]);
 
-  if (error) {
-    return (
-      <div className="app-status">
-        Error: {error}
-      </div>
-    );
-  }
-
   if (!weather) {
     return (
-      <div className="app-status">
-        Loading weather...
+      <div className="app">
+        {renderNavbar()}
+        <div className="app-status">
+          {error ? `Error: ${error}` : "Loading weather..."}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="app">
-      <header className="navbar">
-        <div className="nav-title">☰ Port Weather Assist</div>
+      {renderNavbar()}
 
-        <input
-          className="search"
-          type="text"
-          placeholder="Search location..."
-          defaultValue={city}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && e.target.value.trim() !== "") {
-              setCity(e.target.value.trim());
-            }
-          }}
-        />
-
-        <div className="nav-right">
-          <div className="datetime">{currentTime.toLocaleString()}</div>
-
-          <button
-            type="button"
-            className="theme-toggle"
-            onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-          >
-            {theme === "dark" ? "Light mode" : "Dark mode"}
-          </button>
-        </div>
-      </header>
+      {error && <div className="app-status">Error: {error}</div>}
 
       <main className="dashboard">
         <section className="conditions-panel">
