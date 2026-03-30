@@ -40,12 +40,28 @@ function App() {
   const [error, setError] = useState("");
   const [selectedArrival, setSelectedArrival] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [theme, setTheme] = useState(() => {
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme === "light" || savedTheme === "dark") {
+      return savedTheme;
+    }
+
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  });
 
   const riskPeriods = getDangerousPeriods(forecast);
 
   useEffect(() => {
     localStorage.setItem("lastCity", city);
   }, [city]);
+
+  useEffect(() => {
+    document.documentElement.classList.remove("theme-light", "theme-dark");
+    document.documentElement.classList.add(theme === "dark" ? "theme-dark" : "theme-light");
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
   const loadWeather = useCallback(async () => {
     try {
@@ -187,7 +203,7 @@ function App() {
 
   if (error) {
     return (
-      <div style={{ color: "white", padding: "20px" }}>
+      <div className="app-status">
         Error: {error}
       </div>
     );
@@ -195,7 +211,7 @@ function App() {
 
   if (!weather) {
     return (
-      <div style={{ color: "white", padding: "20px" }}>
+      <div className="app-status">
         Loading weather...
       </div>
     );
@@ -218,7 +234,17 @@ function App() {
           }}
         />
 
-        <div className="datetime">{currentTime.toLocaleString()}</div>
+        <div className="nav-right">
+          <div className="datetime">{currentTime.toLocaleString()}</div>
+
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+          >
+            {theme === "dark" ? "Light mode" : "Dark mode"}
+          </button>
+        </div>
       </header>
 
       <main className="dashboard">
