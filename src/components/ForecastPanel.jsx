@@ -1,4 +1,5 @@
 import { msToKnots } from "../utils/unitConversion";
+import { getForecastIcon } from "../utils/iconMapper";
 
 function ForecastPanel({ forecast }) {
   if (!forecast.length) {
@@ -26,7 +27,7 @@ function ForecastPanel({ forecast }) {
 
             {item.icon && (
               <img
-                src={`https://openweathermap.org/img/wn/${item.icon}@2x.png`}
+                src={`/icons/${item.icon}@2x.png`}
                 alt={item.description}
                 className="forecast-icon"
               />
