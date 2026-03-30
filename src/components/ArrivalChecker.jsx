@@ -38,7 +38,7 @@ function ArrivalChecker({ forecast, selectedArrival, setSelectedArrival }) {
                 Wind: {msToKnots(selectedForecast.windMs).toFixed(1)} kn
             </p>
             <p>
-                isibility: {selectedForecast.visibility.toFixed(1)} km
+                Visibility: {selectedForecast.visibility.toFixed(1)} km
             </p>
             <p>
                 Precipitation: {selectedForecast.precipitation} mm
