@@ -5,7 +5,8 @@
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-  background: #2f4f6f;
+  background: var(--app-bg);
+  color: var(--app-text);
 }
 
 #root {
@@ -15,18 +16,26 @@ body {
 .app {
   min-height: 100vh;
   padding: 24px;
-  background: #2f4f6f;
+  background: var(--app-bg);
+  color: var(--app-text);
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 .navbar {
-  background: #2f3f86;
-  color: white;
+  background: var(--nav-bg);
+  color: var(--nav-text);
   border-radius: 10px;
   padding: 14px 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
+}
+
+.nav-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .nav-title {
@@ -38,16 +47,33 @@ body {
   flex: 1;
   max-width: 320px;
   padding: 10px 14px;
-  border: none;
+  border: 1px solid var(--input-border);
   border-radius: 20px;
   outline: none;
+  background: var(--input-bg);
+  color: var(--app-text);
 }
 
 .datetime {
   font-size: 16px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--nav-chip-bg);
   padding: 8px 12px;
   border-radius: 12px;
+}
+
+.theme-toggle {
+  border-radius: 999px;
+  border: 1px solid var(--toggle-border);
+  padding: 9px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--toggle-bg);
+  color: var(--toggle-text);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  filter: brightness(1.08);
 }
 
 .dashboard {
@@ -59,10 +85,11 @@ body {
 
 .conditions-panel,
 .recommendation-panel {
-  background: #ffffff;
+  background: var(--panel-bg);
+  color: var(--panel-text);
   border-radius: 22px;
   padding: 28px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow);
 }
 
 .conditions-panel h1,
@@ -73,11 +100,11 @@ body {
   margin-top: 0;
   margin-bottom: 20px;
   font-size: 30px;
-  color: #111;
+  color: var(--panel-text);
 }
 
 .weather-card {
-  background: linear-gradient(135deg, #314f72, #2e2e2e);
+  background: linear-gradient(135deg, var(--card-gradient-a), var(--card-gradient-b));
   color: white;
   border-radius: 22px;
   padding: 28px;
@@ -180,17 +207,18 @@ body {
   margin-top: 20px;
   font-size: 14px;
   line-height: 1.5;
-  color: #444;
-  border-top: 1px solid #ccc;
+  color: var(--muted-text);
+  border-top: 1px solid var(--border-soft);
   padding-top: 12px;
 }
 
 .forecast-panel {
-  background: white;
+  background: var(--panel-bg);
+  color: var(--panel-text);
   border-radius: 22px;
   padding: 24px;
   margin-top: 24px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow);
 }
 
 .forecast-grid {
@@ -200,7 +228,8 @@ body {
 }
 
 .forecast-card {
-  background: #f3f5f8;
+  background: var(--muted-card-bg);
+  color: var(--panel-text);
   border-radius: 16px;
   padding: 18px;
   text-align: center;
@@ -257,15 +286,16 @@ body {
 .forecast-wind {
   font-size: 14px;
   margin-top: 6px;
-  color: #333;
+  color: var(--muted-text);
 }
 
 .risk-panel {
-  background: white;
+  background: var(--panel-bg);
+  color: var(--panel-text);
   border-radius: 22px;
   padding: 24px;
   margin-top: 24px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow);
 }
 
 .risk-list {
@@ -307,11 +337,12 @@ body {
 }
 
 .arrival-panel {
-  background: white;
+  background: var(--panel-bg);
+  color: var(--panel-text);
   border-radius: 22px;
   padding: 24px;
   margin-top: 24px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow);
 }
 
 .arrival-label {
@@ -325,9 +356,16 @@ body {
   max-width: 320px;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--app-text);
   font-size: 16px;
   margin-bottom: 20px;
+}
+
+.app-status {
+  color: var(--app-text);
+  padding: 20px;
 }
 
 .arrival-result {
