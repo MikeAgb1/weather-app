@@ -691,6 +691,7 @@ function App() {
   };
 
   const displayWeather = weather || cachedWeather;
+  const [tosOpen, setTosOpen] = useState(false);
 
   function renderNavbar() {
     return (
@@ -714,8 +715,45 @@ function App() {
           <button type="button" className="nav-icon-btn" onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}>
             {theme === "dark" ? "☀ Light" : "☾ Dark"}
           </button>
+          <div>
+            <button
+              type="button"
+              className="nav-icon-btn"
+              onClick={() => setTosOpen(true)}
+            >
+              📄 ToS
+            </button>
+            {tosOpen && <ToSModal onClose={() => setTosOpen(false)} />}
+          </div>
         </div>
       </header>
+    );
+  }
+
+  function ToSModal({ onClose }) {
+    return (
+      <div className="report-modal-overlay" onClick={onClose}>
+        <div className="report-modal" onClick={(e) => e.stopPropagation()}>
+          <div style={{ textAlign: "center", padding: "20px 10px" }}>
+            <p>Weather data is pulled from the <strong>Open Meteo API</strong>.</p>
+            <p>
+              You can visit the Open Meteo website{" "}
+              <a
+                href="https://open-meteo.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                here
+              </a>.
+            </p>
+          </div>
+          <div className="report-actions">
+            <button className="btn btn-primary" onClick={onClose}>
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -806,6 +844,9 @@ function App() {
               >
                 <span className={isFetching ? "spin-icon" : ""}>↻</span> {isFetching ? "Refreshing…" : "Refresh"}
               </button>
+              <div className={`btn connection-status ${isOffline ? "offline" : "online"}`}>
+                {isOffline ? "⚠ Cached" : "🟢 Online"}
+              </div>
               <button type="button" className="btn" onClick={() => setReportOpen(true)}>
                 🚩 Report Issue
               </button>
