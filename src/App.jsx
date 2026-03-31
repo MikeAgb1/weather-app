@@ -2,7 +2,7 @@ import "./App.css";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getWeather } from "./services/weatherAPI";
 import { getTide } from "./services/tideAPI";
-import { getForecast } from "./services/forecastAPI";
+import { getHourlyForecast } from "./services/openMeteoForecastAPI";
 import { getConditionHistory } from "./services/weatherHistoryAPI";
 import { getWaveData } from "./services/waveAPI";
 import {
@@ -219,6 +219,44 @@ function ReportModal({ onClose }) {
   );
 }
 
+/* ─── Risk Outlook Slider ─── */
+function RiskOutlook({ riskPeriods }) {
+  const scrollRef = useRef(null);
+  const scroll = (dir) => {
+    const el = scrollRef.current;
+    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
+  };
+
+  return (
+    <section className="risk-panel">
+      <div className="risk-panel-header">
+        <h1>Operational Risk Outlook</h1>
+        {riskPeriods.length > 0 && (
+          <div className="forecast-nav">
+            <button type="button" className="forecast-arrow" onClick={() => scroll(-1)} aria-label="Scroll left">‹</button>
+            <button type="button" className="forecast-arrow" onClick={() => scroll(1)}  aria-label="Scroll right">›</button>
+          </div>
+        )}
+      </div>
+      {riskPeriods.length > 0 ? (
+        <div className="risk-slider" ref={scrollRef}>
+          {riskPeriods.map((period, i) => (
+            <div key={i} className={`risk-card ${period.status.toLowerCase()}`}>
+              <p className="risk-time">
+                {new Date(period.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </p>
+              <p className="risk-status">{period.status}</p>
+              <p className="risk-reason">{period.reason}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="no-risk">✓ No elevated operational risk detected in the next 24 hours</div>
+      )}
+    </section>
+  );
+}
+
 /* ─── Main App ─── */
 function App() {
   const [weather, setWeather] = useState(null);
@@ -240,6 +278,8 @@ function App() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [cachedWeather, setCachedWeather] = useState(null);
+  const [isFetching, setIsFetching] = useState(false);
+  const [page, setPage] = useState("dashboard");
 
   // Operational limits
   const [windMaxInput, setWindMaxInput] = useState(defaultWindMax);
@@ -297,6 +337,7 @@ function App() {
         setHistoryModalOpen(false);
         setShareOpen(false);
         setReportOpen(false);
+        setTutorialOpen(false);
       }
     };
     window.addEventListener("keydown", handler);
@@ -304,6 +345,8 @@ function App() {
   }, []);
 
   // FIX: Only apply limits when they change, using a ref to track previous values
+  const latLonRef = useRef({ lat: null, lon: null });
+
   const prevLimits = useRef({
     windMaxInput, visibilityMinInput, precipitationMaxInput, waveMaxInput, windGustMaxInput
   });
@@ -330,7 +373,7 @@ function App() {
         waveMaxInput: Number(waveMaxInput),
         windGustMaxInput: Number(windGustMaxInput),
       };
-      loadForecast();
+      if (latLonRef.current.lat != null) loadForecast();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [windMaxInput, visibilityMinInput, precipitationMaxInput, waveMaxInput, windGustMaxInput]);
@@ -353,6 +396,7 @@ function App() {
       if (cached) setCachedWeather(JSON.parse(cached));
       return;
     }
+    setIsFetching(true);
     try {
       setError("");
       const data = await getWeather(city);
@@ -384,6 +428,7 @@ function App() {
         waveHeight: null,
       };
 
+      latLonRef.current = { lat: weatherData.lat, lon: weatherData.lon };
       setWeather(weatherData);
       setCachedWeather(null);
       localStorage.setItem(`weather_${city}`, JSON.stringify({ ...weatherData, cachedAt: Date.now() }));
@@ -392,44 +437,33 @@ function App() {
       const cached = localStorage.getItem(`weather_${city}`);
       if (cached) setCachedWeather(JSON.parse(cached));
       setError("Location not found. Please try another city.");
+    } finally {
+      setIsFetching(false);
     }
   }, [city, isOffline]);
 
   const loadForecast = useCallback(async () => {
-    if (isOffline) return;
+    const { lat, lon } = latLonRef.current;
+    if (lat == null || lon == null || isOffline) return;
     try {
-      const data = await getForecast(city);
-      const now = Date.now();
-      const next24Hours = data.list
-        .filter((item) => {
-          const t = new Date(item.dt_txt).getTime();
-          return t > now && t <= now + 24 * 60 * 60 * 1000;
-        })
-        .map((item) => {
-          const visibilityKm = item.visibility ? item.visibility / 1000 : 0;
-          const windMs = item.wind?.speed ?? 0;
-          const rain3h = item.rain?.["3h"] ?? 0;
-          const slotSafety = calculateSafetyStatus(windMs, visibilityKm, rain3h, null);
+      const items = await getHourlyForecast(lat, lon);
+      setForecast(
+        items.map((item) => {
+          const slotSafety = calculateSafetyStatus(item.windMs, item.visibility, item.precipitation, item.waveHeight);
           return {
-            time: item.dt_txt,
-            temp: item.main.temp,
-            windMs,
-            visibility: visibilityKm,
-            precipitation: rain3h,
-            description: item.weather?.[0]?.description || "No description",
-            icon: item.weather?.[0]?.icon || "",
+            ...item,
             status: slotSafety.status,
             statusClass: slotSafety.statusClass,
             reason: slotSafety.reason,
             confidence: slotSafety.confidence,
           };
-        });
-      setForecast(next24Hours);
+        })
+      );
     } catch (err) {
-      console.error("Forecast fetch error:", err);
+      console.error("Hourly forecast fetch error:", err);
       setForecast([]);
     }
-  }, [city, isOffline]);
+  }, [isOffline]);
 
   const loadTide = useCallback(async (lat, lon) => {
     if (lat == null || lon == null || isOffline) return;
@@ -469,8 +503,9 @@ function App() {
     }
   }, [isOffline]);
 
-  // City change: reset + reload
+  // City change: reset + reload weather (forecast loads after lat/lon are known)
   useEffect(() => {
+    latLonRef.current = { lat: null, lon: null };
     setTide(null);
     setWaveData(null);
     setForecast([]);
@@ -481,8 +516,7 @@ function App() {
     setHistoryError("");
     setHistoryCache({});
     loadWeather();
-    loadForecast();
-  }, [city, loadWeather, loadForecast]);
+  }, [city, loadWeather]);
 
   // Auto-refresh
   useEffect(() => {
@@ -491,16 +525,19 @@ function App() {
   }, [loadWeather]);
 
   useEffect(() => {
-    const i = setInterval(loadForecast, 30 * 60 * 1000);
+    const i = setInterval(() => {
+      if (latLonRef.current.lat != null) loadForecast();
+    }, 30 * 60 * 1000);
     return () => clearInterval(i);
   }, [loadForecast]);
 
-  // Load tide and waves when coordinates are known
+  // Load tide, waves, and hourly forecast when coordinates are known
   useEffect(() => {
     if (!weather || weather.lat == null) return;
     loadTide(weather.lat, weather.lon);
     loadWaves(weather.lat, weather.lon);
-  }, [weather?.lat, weather?.lon, loadTide, loadWaves]);
+    loadForecast();
+  }, [weather?.lat, weather?.lon, loadTide, loadWaves, loadForecast]);
 
   const handleOpenHistory = async (conditionKey) => {
     const w = weather || cachedWeather;
@@ -556,10 +593,32 @@ function App() {
     );
   }
 
+  function renderPageTabs() {
+    return (
+      <nav className="page-tabs">
+        {[
+          { id: "dashboard", label: "Dashboard" },
+          { id: "forecast",  label: "Forecast" },
+          { id: "planning",  label: "Planning" },
+        ].map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            className={`page-tab${page === id ? " active" : ""}`}
+            onClick={() => setPage(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+    );
+  }
+
   if (!displayWeather) {
     return (
       <div className="app">
         {renderNavbar()}
+        {renderPageTabs()}
         <div className="app-status">
           {error ? `⚠ ${error}` : "Loading weather data…"}
         </div>
@@ -587,6 +646,7 @@ function App() {
       {tutorialOpen && <TutorialModal onClose={closeTutorial} />}
 
       {renderNavbar()}
+      {renderPageTabs()}
 
       {isOffline && (
         <div className="offline-banner">
@@ -597,14 +657,33 @@ function App() {
 
       {error && !isOffline && <div className="error-banner">⚠ {error}</div>}
 
-      <main className="dashboard">
+      {/* ── Dashboard page ── */}
+      {page === "dashboard" && <main className="dashboard">
         {/* Current Conditions */}
         <section className="conditions-panel">
           <div className="panel-header">
             <h1 style={{ margin: 0 }}>Current Conditions</h1>
-            <button type="button" className="btn" onClick={() => setReportOpen(true)}>
-              🚩 Report Issue
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className={`btn${isFetching ? " btn-fetching" : ""}`}
+                disabled={isFetching || isOffline}
+                onClick={() => {
+                  loadWeather();
+                  loadForecast();
+                  if (displayWeather?.lat != null) {
+                    loadTide(displayWeather.lat, displayWeather.lon);
+                    loadWaves(displayWeather.lat, displayWeather.lon);
+                  }
+                }}
+                title="Refresh all data"
+              >
+                <span className={isFetching ? "spin-icon" : ""}>↻</span> {isFetching ? "Refreshing…" : "Refresh"}
+              </button>
+              <button type="button" className="btn" onClick={() => setReportOpen(true)}>
+                🚩 Report Issue
+              </button>
+            </div>
           </div>
           <div className="weather-card">
             <div>
@@ -683,6 +762,9 @@ function App() {
             {displayWeather.wavePeriod != null && (
               <li><span>Wave Period</span><strong>{displayWeather.wavePeriod.toFixed(1)} s</strong></li>
             )}
+            {displayWeather.waveDirection != null && (
+              <li><span>Wave Dir.</span><strong>{getCompassDirection(displayWeather.waveDirection)} ({Math.round(displayWeather.waveDirection)}°)</strong></li>
+            )}
             <li><span>Updated</span><strong style={{ fontSize: 11 }}>{displayWeather.updatedAt}</strong></li>
             {tide?.data?.length > 0 ? (
               <>
@@ -711,100 +793,60 @@ function App() {
             Final operational judgement remains with the harbour master.
           </p>
         </aside>
-      </main>
+      </main>}
 
-      {/* Risk Outlook */}
-      <section className="risk-panel">
-        <h1>Operational Risk Outlook</h1>
-        {riskPeriods.length > 0 ? (
-          <div className="risk-list">
-            {riskPeriods.map((period, i) => (
-              <div key={i} className={`risk-item ${period.status.toLowerCase()}`}>
-                <p className="risk-time">
-                  {new Date(period.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </p>
-                <div className="risk-info">
-                  <p className="risk-status">{period.status}</p>
-                  <p className="risk-reason">{period.reason}</p>
-                </div>
+      {/* Risk Outlook — also on dashboard */}
+      {page === "dashboard" && (
+        <RiskOutlook riskPeriods={riskPeriods} />
+      )}
+
+      {/* ── Forecast page ── */}
+      {page === "forecast" && <ForecastPanel forecast={forecast} />}
+
+      {/* ── Planning page ── */}
+      {page === "planning" && (
+        <div className="bottom-panels">
+          <ArrivalChecker
+            forecast={forecast}
+            selectedArrival={selectedArrival}
+            setSelectedArrival={setSelectedArrival}
+          />
+
+          <section className="limits-panel">
+            <h1>Operational Limits</h1>
+            <div className="limits-grid">
+              <div className="limit-item">
+                <label>Max Wind Speed (kn)</label>
+                <input type="number" value={windMaxInput} placeholder="e.g. 12" min="0"
+                  onChange={(e) => setWindMaxInput(Math.max(0, Number(e.target.value)))} />
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="no-risk">✓ No elevated operational risk detected in the next 24 hours</div>
-        )}
-      </section>
-
-      <ForecastPanel forecast={forecast} />
-
-      <div className="bottom-panels">
-        <ArrivalChecker
-          forecast={forecast}
-          selectedArrival={selectedArrival}
-          setSelectedArrival={setSelectedArrival}
-        />
-
-        {/* Operational Limits */}
-        <section className="limits-panel">
-          <h1>Operational Limits</h1>
-          <div className="limits-grid">
-            <div className="limit-item">
-              <label>Max Wind Speed (kn)</label>
-              <input
-                type="number"
-                value={windMaxInput}
-                placeholder="e.g. 12"
-                min="0"
-                onChange={(e) => setWindMaxInput(Math.max(0, Number(e.target.value)))}
-              />
+              <div className="limit-item">
+                <label>Max Wind Gust (kn)</label>
+                <input type="number" value={windGustMaxInput} placeholder="e.g. 18" min="0"
+                  onChange={(e) => setWindGustMaxInput(Math.max(0, Number(e.target.value)))} />
+              </div>
+              <div className="limit-item">
+                <label>Min Visibility (km)</label>
+                <input type="number" value={visibilityMinInput} placeholder="e.g. 3" min="0"
+                  onChange={(e) => setVisibilityMinInput(Math.max(0, Number(e.target.value)))} />
+              </div>
+              <div className="limit-item">
+                <label>Max Precipitation (mm)</label>
+                <input type="number" value={precipitationMaxInput} placeholder="e.g. 8" min="0"
+                  onChange={(e) => setPrecipitationMaxInput(Math.max(0, Number(e.target.value)))} />
+              </div>
+              <div className="limit-item">
+                <label>Max Wave Height (m)</label>
+                <input type="number" value={waveMaxInput} placeholder="e.g. 2.5" min="0" step="0.1"
+                  onChange={(e) => setWaveMaxInput(Math.max(0, Number(e.target.value)))} />
+              </div>
             </div>
-            <div className="limit-item">
-              <label>Max Wind Gust (kn)</label>
-              <input
-                type="number"
-                value={windGustMaxInput}
-                placeholder="e.g. 18"
-                min="0"
-                onChange={(e) => setWindGustMaxInput(Math.max(0, Number(e.target.value)))}
-              />
-            </div>
-            <div className="limit-item">
-              <label>Min Visibility (km)</label>
-              <input
-                type="number"
-                value={visibilityMinInput}
-                placeholder="e.g. 3"
-                min="0"
-                onChange={(e) => setVisibilityMinInput(Math.max(0, Number(e.target.value)))}
-              />
-            </div>
-            <div className="limit-item">
-              <label>Max Precipitation (mm)</label>
-              <input
-                type="number"
-                value={precipitationMaxInput}
-                placeholder="e.g. 8"
-                min="0"
-                onChange={(e) => setPrecipitationMaxInput(Math.max(0, Number(e.target.value)))}
-              />
-            </div>
-            <div className="limit-item">
-              <label>Max Wave Height (m)</label>
-              <input
-                type="number"
-                value={waveMaxInput}
-                placeholder="e.g. 2.5"
-                min="0"
-                step="0.1"
-                onChange={(e) => setWaveMaxInput(Math.max(0, Number(e.target.value)))}
-              />
-            </div>
-          </div>
-          <p className="limits-note">
-            Thresholds update the safety assessment immediately. Set values to match your port's pilotage directions. All values must be greater than 0.
-          </p>
-        </section>
-      </div>
+            <p className="limits-note">
+              Thresholds update the safety assessment immediately. Set values to match your port's pilotage directions.
+            </p>
+          </section>
+        </div>
+      )}
 
       {/* History Modal */}
       {historyModalOpen && (
@@ -829,16 +871,34 @@ function App() {
             {!historyLoading && !historyError && conditionHistory.length === 0 && (
               <p style={{ color: "var(--muted-text)" }}>No historical data found for this condition.</p>
             )}
-            {!historyLoading && !historyError && conditionHistory.length > 0 && (
-              <div className="history-list">
-                {conditionHistory.map((entry) => (
-                  <div key={entry.time} className="history-row">
-                    <span>{new Date(entry.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                    <strong>{formatHistoryValue(selectedCondition, entry.value)}</strong>
+            {!historyLoading && !historyError && conditionHistory.length > 0 && (() => {
+              const vals = conditionHistory.map((e) => e.value).filter((v) => v != null && !isNaN(v));
+              const minVal = Math.min(...vals);
+              const maxVal = Math.max(...vals);
+              const range = maxVal - minVal || 1;
+              return (
+                <>
+                  <div className="history-spark" aria-hidden="true">
+                    {conditionHistory.map((entry, i) => (
+                      <div
+                        key={i}
+                        className="history-spark-bar"
+                        style={{ height: `${Math.max(6, ((entry.value - minVal) / range) * 100)}%` }}
+                        title={`${formatHistoryValue(selectedCondition, entry.value)} · ${new Date(entry.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="history-list">
+                    {conditionHistory.map((entry) => (
+                      <div key={entry.time} className="history-row">
+                        <span>{new Date(entry.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                        <strong>{formatHistoryValue(selectedCondition, entry.value)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
           </section>
         </div>
       )}
