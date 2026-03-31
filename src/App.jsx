@@ -721,7 +721,7 @@ function App() {
               className="nav-icon-btn"
               onClick={() => setTosOpen(true)}
             >
-              📄 ToS
+              📄 Credits
             </button>
             {tosOpen && <ToSModal onClose={() => setTosOpen(false)} />}
           </div>
@@ -735,7 +735,18 @@ function App() {
       <div className="report-modal-overlay" onClick={onClose}>
         <div className="report-modal" onClick={(e) => e.stopPropagation()}>
           <div style={{ textAlign: "center", padding: "20px 10px" }}>
-            <p>Weather data is pulled from the <strong>Open Meteo API</strong>.</p>
+            <p>We use <strong>OpenWeatherMap</strong> to retrieve the current weather and coordinates of inputted locations.</p>
+            <p>
+              You can visit the OpenWeatherMap website{" "}
+              <a
+                href="https://openweathermap.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                here
+              </a>.
+            </p>
+            <p>Hourly weather forecasts and wava data is pulled from the <strong>Open Meteo API</strong>.</p>
             <p>
               You can visit the Open Meteo website{" "}
               <a
@@ -745,7 +756,19 @@ function App() {
               >
                 here
               </a>.
+              </p>
+              <p><strong>Stormglass</strong> provides us with tide predictions.</p>
+            <p>
+              You can visit the Stormglass website{" "}
+              <a
+                href="https://stormglass.io/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                here
+              </a>.
             </p>
+            <p>All of our risk assessments are based off real pilotage directions, but they may vary notably from port to port. Please customise operational limits in the 'Planning' tab for best results.</p>
           </div>
           <div className="report-actions">
             <button className="btn btn-primary" onClick={onClose}>
