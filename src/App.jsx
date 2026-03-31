@@ -4,7 +4,14 @@ import { getWeather } from "./services/weatherAPI";
 import { getTide } from "./services/tideAPI";
 import { getForecast } from "./services/forecastAPI";
 import { getConditionHistory } from "./services/weatherHistoryAPI";
-import { calculateSafetyStatus } from "./utils/safetyLogic";
+import {calculateSafetyStatus, 
+  windMax as defaultWindMax,
+  visibilityMin as defaultVisibilityMin,
+  precipitationMax as defaultPrecipitationMax,
+  setWindMax,
+  setVisibilityMin,
+  setPrecipitationMax,
+} from "./utils/safetyLogic";
 import { msToKnots } from "./utils/unitConversion";
 import ForecastPanel from "./components/ForecastPanel";
 import ArrivalChecker from "./components/ArrivalChecker";
@@ -325,6 +332,16 @@ function App() {
       setHistoryLoading(false);
     }
   };
+  const [windMaxInput,setWindMaxInput] = useState(defaultWindMax);
+  const [visibilityMinInput, setVisibilityMinInput ] = useState(defaultVisibilityMin);
+  const [precipitationMaxInput, setPrecipitationMaxInput] = useState(defaultPrecipitationMax);
+
+  useEffect(() => {
+    setWindMax(Number(windMaxInput) );
+    setVisibilityMin(Number(visibilityMinInput));
+     setPrecipitationMax(Number(precipitationMaxInput));
+    loadForecast(); 
+  },);
 
   if (!weather) {
     return (
@@ -569,6 +586,30 @@ function App() {
         selectedArrival={selectedArrival}
         setSelectedArrival={setSelectedArrival}
       />
+      <section className="arrival-panel">
+        <h1>Operational Limits</h1>
+          <label className="arrival-label">
+            Max Wind (kn):{" "}
+            <input className="arrival-select"
+              value={windMaxInput}
+              onChange={e =>setWindMaxInput(e.target.value)}
+            />
+          </label>
+          <label className="arrival-label">
+            Min Visibility (km):{" "}
+            <input className="arrival-select"
+              value={visibilityMinInput}
+              onChange={e => setVisibilityMinInput(e.target.value)}
+            />
+          </label>
+          <label className="arrival-label">
+            Max Precipitation (mm):{" "}
+            <input className="arrival-select"
+              value={precipitationMaxInput}
+              onChange={e => setPrecipitationMaxInput(e.target.value)}
+            />
+          </label >
+      </section>
     </div>
   );
 }

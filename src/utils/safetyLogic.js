@@ -1,3 +1,16 @@
+export let windMax = 12;
+export let visibilityMin = 3;
+export let precipitationMax = 8;
+export function setWindMax(val) {
+  windMax = val;
+}
+export function setVisibilityMin(val) {
+  visibilityMin = val;
+}
+export function setPrecipitationMax(val) {
+  precipitationMax = val;
+}
+
 export function calculateSafetyStatus(windMs, visibilityKm, precipitationMm = 0) {
     if (windMs == null || visibilityKm == null) {
       return {
@@ -11,7 +24,7 @@ export function calculateSafetyStatus(windMs, visibilityKm, precipitationMm = 0)
     }
   
     // Dangerous conditions
-    if (windMs > 12 || visibilityKm < 3 || precipitationMm > 6) {
+    if (windMs > windMax || visibilityKm < visibilityMin || precipitationMm > precipitationMax) {
       return {
         status: "DANGEROUS",
         confidence: 85,
@@ -45,9 +58,9 @@ export function calculateSafetyStatus(windMs, visibilityKm, precipitationMm = 0)
   }
   
   function getPrimaryReason(windMs, visibilityKm, precipitationMm) {
-    if (windMs > 12) return "Wind exceeds safe threshold";
-    if (visibilityKm < 3) return "Visibility is critically low";
-    if (precipitationMm > 6) return "Heavy precipitation affecting operations";
+    if (windMs > windMax) return "Wind exceeds safe threshold";
+    if (visibilityKm < visibilityMin) return "Visibility is critically low";
+    if (precipitationMm > precipitationMax) return "Heavy precipitation affecting operations";
   
     if (windMs > 7) return "Elevated wind conditions";
     if (visibilityKm < 8) return "Reduced visibility";
