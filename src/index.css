@@ -1,5 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+
 :root {
-  font-family: Arial, sans-serif;
+  font-family: 'IBM Plex Sans', sans-serif;
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
@@ -10,51 +12,69 @@
 
 :root.theme-light {
   color-scheme: light;
-  --app-bg: #e9edf3;
-  --app-text: #161c25;
-  --nav-bg: #2f3f86;
+  --app-bg: #eef1f7;
+  --app-text: #0d1524;
+  --nav-bg: #1a2744;
   --nav-text: #ffffff;
-  --nav-chip-bg: rgba(255, 255, 255, 0.12);
+  --nav-chip-bg: rgba(255,255,255,0.12);
   --panel-bg: #ffffff;
-  --panel-text: #111111;
-  --card-gradient-a: #314f72;
-  --card-gradient-b: #2e2e2e;
-  --muted-card-bg: #f3f5f8;
-  --muted-text: #333333;
-  --input-bg: #ffffff;
-  --input-border: #cccccc;
-  --border-soft: #cccccc;
-  --shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
-  --toggle-bg: rgba(255, 255, 255, 0.14);
+  --panel-text: #0d1524;
+  --card-gradient-a: #1e3a5f;
+  --card-gradient-b: #0f2035;
+  --muted-card-bg: #f4f6fb;
+  --muted-text: #4a5568;
+  --input-bg: #f4f6fb;
+  --input-border: #c8d0e0;
+  --border-soft: #e2e8f0;
+  --shadow: 0 4px 24px rgba(0,0,0,0.10);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,0.14);
+  --toggle-bg: rgba(255,255,255,0.14);
   --toggle-text: #ffffff;
-  --toggle-border: rgba(255, 255, 255, 0.32);
+  --toggle-border: rgba(255,255,255,0.28);
+  --accent: #2563eb;
+  --safe-color: #16a34a;
+  --moderate-color: #d97706;
+  --dangerous-color: #dc2626;
+  --safe-bg: rgba(22,163,74,0.1);
+  --moderate-bg: rgba(217,119,6,0.1);
+  --dangerous-bg: rgba(220,38,38,0.1);
+  --offline-bg: #fef9c3;
+  --offline-text: #854d0e;
 }
-/* 
-
-hshshhshs
-*/
 
 :root.theme-dark {
   color-scheme: dark;
-  --app-bg: #121721;
-  --app-text: #e7edf8;
-  --nav-bg: #1b243b;
-  --nav-text: #f2f6ff;
-  --nav-chip-bg: rgba(255, 255, 255, 0.1);
-  --panel-bg: #1c2432;
-  --panel-text: #e7edf8;
-  --card-gradient-a: #273853;
-  --card-gradient-b: #18222f;
-  --muted-card-bg: #263041;
-  --muted-text: #d6deec;
-  --input-bg: #111827;
-  --input-border: #3a465c;
-  --border-soft: #3a465c;
-  --shadow: 0 10px 24px rgba(0, 0, 0, 0.42);
-  --toggle-bg: rgba(255, 255, 255, 0.08);
-  --toggle-text: #f2f6ff;
-  --toggle-border: rgba(255, 255, 255, 0.2);
+  --app-bg: #0a0f1a;
+  --app-text: #e2eaf8;
+  --nav-bg: #111827;
+  --nav-text: #f0f6ff;
+  --nav-chip-bg: rgba(255,255,255,0.08);
+  --panel-bg: #141e2e;
+  --panel-text: #e2eaf8;
+  --card-gradient-a: #1e3352;
+  --card-gradient-b: #0e1a2b;
+  --muted-card-bg: #1a2540;
+  --muted-text: #94a3b8;
+  --input-bg: #0f172a;
+  --input-border: #2d3f5c;
+  --border-soft: #1e2d45;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,0.55);
+  --toggle-bg: rgba(255,255,255,0.06);
+  --toggle-text: #f0f6ff;
+  --toggle-border: rgba(255,255,255,0.16);
+  --accent: #3b82f6;
+  --safe-color: #22c55e;
+  --moderate-color: #f59e0b;
+  --dangerous-color: #ef4444;
+  --safe-bg: rgba(34,197,94,0.15);
+  --moderate-bg: rgba(245,158,11,0.15);
+  --dangerous-bg: rgba(239,68,68,0.15);
+  --offline-bg: rgba(234,179,8,0.12);
+  --offline-text: #fde047;
 }
+
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
@@ -62,5 +82,5 @@ body {
   min-height: 100vh;
   background: var(--app-bg);
   color: var(--app-text);
+  transition: background 0.3s ease, color 0.3s ease;
 }
-
