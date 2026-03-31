@@ -12,6 +12,7 @@
 
 import { useRef } from "react";
 import { msToKnots } from "../utils/unitConversion";
+import { getForecastIcon } from "../utils/iconMapper";
 
 /**
  * @param {{ forecast: Array }} props
@@ -67,10 +68,10 @@ function ForecastPanel({ forecast }) {
               {new Date(item.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </p>
 
-            {/* Weather icon sourced from OWM CDN using the mapped icon code */}
+            {/* Weather icon used to be sourced from OWM CDN using the mapped icon code */}
             {item.icon && (
               <img
-                src={`https://openweathermap.org/img/wn/${item.icon}@2x.png`}
+                src={getForecastIcon(item.icon)}
                 alt={item.description}
                 className="forecast-icon"
               />
