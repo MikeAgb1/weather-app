@@ -13,7 +13,7 @@ function ArrivalChecker({ forecast, selectedArrival, setSelectedArrival }) {
         value={selectedArrival}
         onChange={(e) => setSelectedArrival(e.target.value)}
       >
-        <option value="">Choose an arrival time</option>
+        <option value="">Choose an arrival time…</option>
         {forecast.map((item, index) => (
           <option key={index} value={item.time}>
             {new Date(item.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -31,6 +31,9 @@ function ArrivalChecker({ forecast, selectedArrival, setSelectedArrival }) {
             <span className="arrival-stat">Wind: {msToKnots(selectedForecast.windMs).toFixed(1)} kn</span>
             <span className="arrival-stat">Vis: {selectedForecast.visibility.toFixed(1)} km</span>
             <span className="arrival-stat">Precip: {selectedForecast.precipitation} mm</span>
+            {selectedForecast.confidence != null && (
+              <span className="arrival-stat">Confidence: {selectedForecast.confidence}%</span>
+            )}
           </div>
         </div>
       )}

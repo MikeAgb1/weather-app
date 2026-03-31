@@ -5,6 +5,7 @@ const conditionToHourlyField = {
   wind: "wind_speed_10m",
   windDirection: "wind_direction_10m",
   precipitation: "precipitation",
+  waveHeight: "wave_height",
 };
 
 function formatDate(date) {
@@ -21,14 +22,27 @@ export async function getConditionHistory(lat, lon, conditionKey) {
   const now = new Date();
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const url =
-    `https://archive-api.open-meteo.com/v1/archive` +
-    `?latitude=${encodeURIComponent(lat)}` +
-    `&longitude=${encodeURIComponent(lon)}` +
-    `&start_date=${formatDate(yesterday)}` +
-    `&end_date=${formatDate(now)}` +
-    `&hourly=${hourlyField}` +
-    `&timezone=auto`;
+  // Wave height uses the Marine API, everything else uses the Archive API
+  let url;
+  if (conditionKey === "waveHeight") {
+    url =
+      `https://marine-api.open-meteo.com/v1/marine` +
+      `?latitude=${encodeURIComponent(lat)}` +
+      `&longitude=${encodeURIComponent(lon)}` +
+      `&hourly=${hourlyField}` +
+      `&start_date=${formatDate(yesterday)}` +
+      `&end_date=${formatDate(now)}` +
+      `&timezone=auto`;
+  } else {
+    url =
+      `https://archive-api.open-meteo.com/v1/archive` +
+      `?latitude=${encodeURIComponent(lat)}` +
+      `&longitude=${encodeURIComponent(lon)}` +
+      `&start_date=${formatDate(yesterday)}` +
+      `&end_date=${formatDate(now)}` +
+      `&hourly=${hourlyField}` +
+      `&timezone=auto`;
+  }
 
   const response = await fetch(url);
   const data = await response.json();
@@ -42,10 +56,7 @@ export async function getConditionHistory(lat, lon, conditionKey) {
   const cutoff = now.getTime() - 24 * 60 * 60 * 1000;
 
   return times
-    .map((time, index) => ({
-      time,
-      value: values[index],
-    }))
+    .map((time, index) => ({ time, value: values[index] }))
     .filter((item) => {
       const timeMs = new Date(item.time).getTime();
       return (

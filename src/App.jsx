@@ -4,14 +4,19 @@ import { getWeather } from "./services/weatherAPI";
 import { getTide } from "./services/tideAPI";
 import { getForecast } from "./services/forecastAPI";
 import { getConditionHistory } from "./services/weatherHistoryAPI";
+import { getWaveData } from "./services/waveAPI";
 import {
   calculateSafetyStatus,
   windMax as defaultWindMax,
   visibilityMin as defaultVisibilityMin,
   precipitationMax as defaultPrecipitationMax,
+  waveMax as defaultWaveMax,
+  windGustMax as defaultWindGustMax,
   setWindMax,
   setVisibilityMin,
   setPrecipitationMax,
+  setWaveMax,
+  setWindGustMax,
 } from "./utils/safetyLogic";
 import { msToKnots } from "./utils/unitConversion";
 import ForecastPanel from "./components/ForecastPanel";
@@ -33,9 +38,10 @@ const conditionLabels = {
   humidity: "Humidity",
   visibility: "Visibility",
   pressure: "Air Pressure",
-  wind: "Wind",
+  wind: "Wind Speed",
   windDirection: "Wind Direction",
   precipitation: "Precipitation",
+  waveHeight: "Wave Height",
 };
 
 function formatHistoryValue(conditionKey, value) {
@@ -44,9 +50,10 @@ function formatHistoryValue(conditionKey, value) {
     case "humidity": return `${Math.round(value)}%`;
     case "visibility": return `${(value / 1000).toFixed(1)} km`;
     case "pressure": return `${Math.round(value)} hPa`;
-    case "wind": return `${(value / 1.852).toFixed(1)} kn`;
+    case "wind": return `${msToKnots(value).toFixed(1)} kn`;
     case "windDirection": return `${getCompassDirection(value)} (${Math.round(value)}°)`;
     case "precipitation": return `${value.toFixed(1)} mm`;
+    case "waveHeight": return `${value.toFixed(2)} m`;
     default: return `${value}`;
   }
 }
@@ -63,10 +70,10 @@ function TutorialModal({ onClose }) {
           {[
             { title: "Search your port", desc: "Type a location in the search bar and press Enter to load live weather data." },
             { title: "Read the safety status", desc: "The Recommendation panel shows SAFE, MODERATE, or DANGEROUS based on current conditions." },
-            { title: "Inspect metrics", desc: "Click any metric card (humidity, wind, etc.) to view its 24-hour history." },
+            { title: "Inspect metrics", desc: "Click any metric card (humidity, wind, wave height, etc.) to view its 24-hour history." },
             { title: "Check the forecast", desc: "Scroll down to see the 24-hour forecast and risk outlook timeline." },
             { title: "Set arrival time", desc: "Use the Arrival Assessment panel to check safety for a specific ship arrival time." },
-            { title: "Adjust limits", desc: "Customise wind, visibility and precipitation thresholds in Operational Limits to match your port's pilotage directions." },
+            { title: "Adjust limits", desc: "Customise wind, visibility, wave and precipitation thresholds in Operational Limits to match your port's pilotage directions." },
           ].map((step, i) => (
             <div className="tutorial-step" key={i}>
               <div className="tutorial-step-num">{i + 1}</div>
@@ -88,25 +95,27 @@ function TutorialModal({ onClose }) {
 /* ─── Share Modal ─── */
 function ShareModal({ weather, tide, onClose }) {
   const [copied, setCopied] = useState(false);
-
   const timestamp = new Date().toLocaleString();
 
   const text = [
     "PORT WEATHER ASSIST — CONDITIONS REPORT",
-    `Location: ${weather.location}`,
-    `Time: ${timestamp}`,
-    `Status: ${weather.status} (Confidence: ${weather.confidence}%)`,
-    "─".repeat(38),
+    `Location:      ${weather.location}`,
+    `Time:          ${timestamp}`,
+    `Status:        ${weather.status} (Confidence: ${weather.confidence}%)`,
+    "─".repeat(42),
     `Temperature:   ${weather.temperature.toFixed(1)}°C`,
     `Wind:          ${msToKnots(weather.windMs).toFixed(1)} kn (${weather.windDirection})`,
     `Visibility:    ${weather.visibility.toFixed(1)} km`,
     `Precipitation: ${weather.precipitation} mm`,
     `Humidity:      ${weather.humidity}%`,
     `Pressure:      ${weather.pressure} hPa`,
+    weather.waveHeight != null
+      ? `Wave Height:   ${weather.waveHeight.toFixed(2)} m`
+      : `Wave Height:   Unavailable`,
     tide?.data?.length
       ? `Next Tide:     ${tide.data[0].type.toUpperCase()} at ${new Date(tide.data[0].time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
       : "Tide:          Unavailable",
-    "─".repeat(38),
+    "─".repeat(42),
     `Note: ${weather.recommendation}`,
     "All recommendations are decision support only. Final operational judgement remains with the harbour master.",
   ].join("\n");
@@ -131,6 +140,7 @@ function ShareModal({ weather, tide, onClose }) {
             ["Wind", `${msToKnots(weather.windMs).toFixed(1)} kn (${weather.windDirection})`],
             ["Visibility", `${weather.visibility.toFixed(1)} km`],
             ["Precipitation", `${weather.precipitation} mm`],
+            ["Wave Height", weather.waveHeight != null ? `${weather.waveHeight.toFixed(2)} m` : "N/A"],
             ["Humidity", `${weather.humidity}%`],
             ["Pressure", `${weather.pressure} hPa`],
             ["Confidence", `${weather.confidence}%`],
@@ -160,7 +170,6 @@ function ReportModal({ onClose }) {
 
   const handleSubmit = () => {
     if (!details.trim()) return;
-    // In a real app this would POST to a backend. Here we log and confirm.
     console.log("Issue reported:", { type, details, timestamp: new Date().toISOString() });
     setSubmitted(true);
     setTimeout(onClose, 2000);
@@ -192,7 +201,7 @@ function ReportModal({ onClose }) {
               <label>Details</label>
               <textarea
                 rows={4}
-                placeholder="Describe the issue..."
+                placeholder="Describe the issue in as much detail as possible..."
                 value={details}
                 onChange={(e) => setDetails(e.target.value)}
               />
@@ -214,6 +223,7 @@ function ReportModal({ onClose }) {
 function App() {
   const [weather, setWeather] = useState(null);
   const [tide, setTide] = useState(null);
+  const [waveData, setWaveData] = useState(null);
   const [forecast, setForecast] = useState([]);
   const [city, setCity] = useState(() => localStorage.getItem("lastCity") || "London");
   const [error, setError] = useState("");
@@ -231,10 +241,12 @@ function App() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [cachedWeather, setCachedWeather] = useState(null);
 
-  // Operational limits — stored in state, applied via refs to avoid re-render loops
+  // Operational limits
   const [windMaxInput, setWindMaxInput] = useState(defaultWindMax);
   const [visibilityMinInput, setVisibilityMinInput] = useState(defaultVisibilityMin);
   const [precipitationMaxInput, setPrecipitationMaxInput] = useState(defaultPrecipitationMax);
+  const [waveMaxInput, setWaveMaxInput] = useState(defaultWaveMax);
+  const [windGustMaxInput, setWindGustMaxInput] = useState(defaultWindGustMax);
 
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem("theme");
@@ -244,11 +256,9 @@ function App() {
 
   const riskPeriods = getDangerousPeriods(forecast);
 
-  // ── Tutorial on first visit
+  // Tutorial on first visit
   useEffect(() => {
-    if (!localStorage.getItem("tutorialSeen")) {
-      setTutorialOpen(true);
-    }
+    if (!localStorage.getItem("tutorialSeen")) setTutorialOpen(true);
   }, []);
 
   const closeTutorial = () => {
@@ -256,7 +266,7 @@ function App() {
     localStorage.setItem("tutorialSeen", "1");
   };
 
-  // ── Online / offline detection
+  // Online/offline detection
   useEffect(() => {
     const goOnline = () => setIsOffline(false);
     const goOffline = () => setIsOffline(true);
@@ -268,19 +278,19 @@ function App() {
     };
   }, []);
 
-  // ── Theme
+  // Theme — fixes dark/light mode text colour issue by using CSS variables throughout
   useEffect(() => {
     document.documentElement.classList.remove("theme-light", "theme-dark");
     document.documentElement.classList.add(theme === "dark" ? "theme-dark" : "theme-light");
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  // ── Persist city
+  // Persist city
   useEffect(() => {
     localStorage.setItem("lastCity", city);
   }, [city]);
 
-  // ── Escape key closes modals
+  // Escape closes modals
   useEffect(() => {
     const handler = (e) => {
       if (e.key === "Escape") {
@@ -293,30 +303,39 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // ── FIX: Apply operational limits only when they actually change
-  const prevLimits = useRef({ windMaxInput, visibilityMinInput, precipitationMaxInput });
+  // FIX: Only apply limits when they change, using a ref to track previous values
+  const prevLimits = useRef({
+    windMaxInput, visibilityMinInput, precipitationMaxInput, waveMaxInput, windGustMaxInput
+  });
+
   useEffect(() => {
     const prev = prevLimits.current;
-    const windChanged = Number(windMaxInput) !== prev.windMaxInput;
-    const visChanged = Number(visibilityMinInput) !== prev.visibilityMinInput;
-    const precipChanged = Number(precipitationMaxInput) !== prev.precipitationMaxInput;
+    const changed =
+      Number(windMaxInput) !== prev.windMaxInput ||
+      Number(visibilityMinInput) !== prev.visibilityMinInput ||
+      Number(precipitationMaxInput) !== prev.precipitationMaxInput ||
+      Number(waveMaxInput) !== prev.waveMaxInput ||
+      Number(windGustMaxInput) !== prev.windGustMaxInput;
 
-    if (windChanged || visChanged || precipChanged) {
+    if (changed) {
       setWindMax(Number(windMaxInput));
       setVisibilityMin(Number(visibilityMinInput));
       setPrecipitationMax(Number(precipitationMaxInput));
+      setWaveMax(Number(waveMaxInput));
+      setWindGustMax(Number(windGustMaxInput));
       prevLimits.current = {
         windMaxInput: Number(windMaxInput),
         visibilityMinInput: Number(visibilityMinInput),
         precipitationMaxInput: Number(precipitationMaxInput),
+        waveMaxInput: Number(waveMaxInput),
+        windGustMaxInput: Number(windGustMaxInput),
       };
-      // Re-run forecast recalculation
       loadForecast();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [windMaxInput, visibilityMinInput, precipitationMaxInput]);
+  }, [windMaxInput, visibilityMinInput, precipitationMaxInput, waveMaxInput, windGustMaxInput]);
 
-  // ── Live clock
+  // Live clock
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -328,13 +347,10 @@ function App() {
     }
   };
 
-  // ── Weather fetch with offline caching
   const loadWeather = useCallback(async () => {
     if (isOffline) {
       const cached = localStorage.getItem(`weather_${city}`);
-      if (cached) {
-        setCachedWeather(JSON.parse(cached));
-      }
+      if (cached) setCachedWeather(JSON.parse(cached));
       return;
     }
     try {
@@ -344,7 +360,7 @@ function App() {
       const windMs = data.wind?.speed ?? 0;
       const windDeg = data.wind?.deg ?? null;
       const rain1h = data.rain?.["1h"] ?? 0;
-      const safety = calculateSafetyStatus(windMs, visibilityKm, rain1h);
+      const safety = calculateSafetyStatus(windMs, visibilityKm, rain1h, null);
 
       const weatherData = {
         location: data.name,
@@ -360,23 +376,21 @@ function App() {
         status: safety.status,
         statusClass: safety.statusClass,
         confidence: safety.confidence,
+        confidenceFactors: safety.confidenceFactors,
         recommendation: safety.recommendation,
         updatedAt: new Date().toLocaleString(),
         lat: data.coord?.lat ?? null,
         lon: data.coord?.lon ?? null,
+        waveHeight: null,
       };
 
       setWeather(weatherData);
       setCachedWeather(null);
-      // Cache for offline use
       localStorage.setItem(`weather_${city}`, JSON.stringify({ ...weatherData, cachedAt: Date.now() }));
     } catch (err) {
       console.error("Weather fetch error:", err);
-      // Try to show cached data
       const cached = localStorage.getItem(`weather_${city}`);
-      if (cached) {
-        setCachedWeather(JSON.parse(cached));
-      }
+      if (cached) setCachedWeather(JSON.parse(cached));
       setError("Location not found. Please try another city.");
     }
   }, [city, isOffline]);
@@ -395,7 +409,7 @@ function App() {
           const visibilityKm = item.visibility ? item.visibility / 1000 : 0;
           const windMs = item.wind?.speed ?? 0;
           const rain3h = item.rain?.["3h"] ?? 0;
-          const slotSafety = calculateSafetyStatus(windMs, visibilityKm, rain3h);
+          const slotSafety = calculateSafetyStatus(windMs, visibilityKm, rain3h, null);
           return {
             time: item.dt_txt,
             temp: item.main.temp,
@@ -407,6 +421,7 @@ function App() {
             status: slotSafety.status,
             statusClass: slotSafety.statusClass,
             reason: slotSafety.reason,
+            confidence: slotSafety.confidence,
           };
         });
       setForecast(next24Hours);
@@ -427,9 +442,37 @@ function App() {
     }
   }, [isOffline]);
 
-  // ── City change: reset + reload
+  const loadWaves = useCallback(async (lat, lon) => {
+    if (lat == null || lon == null || isOffline) return;
+    try {
+      const data = await getWaveData(lat, lon);
+      setWaveData(data);
+      // Update weather state to include wave height so safety can use it
+      setWeather((prev) => {
+        if (!prev) return prev;
+        const safety = calculateSafetyStatus(prev.windMs, prev.visibility, prev.precipitation, data.waveHeight);
+        return {
+          ...prev,
+          waveHeight: data.waveHeight,
+          waveDirection: data.waveDirection,
+          wavePeriod: data.wavePeriod,
+          status: safety.status,
+          statusClass: safety.statusClass,
+          confidence: safety.confidence,
+          confidenceFactors: safety.confidenceFactors,
+          recommendation: safety.recommendation,
+        };
+      });
+    } catch (err) {
+      console.error("Wave fetch error:", err);
+      setWaveData(null);
+    }
+  }, [isOffline]);
+
+  // City change: reset + reload
   useEffect(() => {
     setTide(null);
+    setWaveData(null);
     setForecast([]);
     setSelectedArrival("");
     setHistoryModalOpen(false);
@@ -441,7 +484,7 @@ function App() {
     loadForecast();
   }, [city, loadWeather, loadForecast]);
 
-  // ── Auto-refresh
+  // Auto-refresh
   useEffect(() => {
     const i = setInterval(loadWeather, 10 * 60 * 1000);
     return () => clearInterval(i);
@@ -452,11 +495,12 @@ function App() {
     return () => clearInterval(i);
   }, [loadForecast]);
 
-  // ── Tide load on coord change
+  // Load tide and waves when coordinates are known
   useEffect(() => {
     if (!weather || weather.lat == null) return;
     loadTide(weather.lat, weather.lon);
-  }, [weather?.lat, weather?.lon, loadTide]);
+    loadWaves(weather.lat, weather.lon);
+  }, [weather?.lat, weather?.lon, loadTide, loadWaves]);
 
   const handleOpenHistory = async (conditionKey) => {
     const w = weather || cachedWeather;
@@ -485,18 +529,6 @@ function App() {
 
   const displayWeather = weather || cachedWeather;
 
-  // ── Loading state
-  if (!displayWeather) {
-    return (
-      <div className="app">
-        {renderNavbar()}
-        <div className="app-status">
-          {error ? `⚠ ${error}` : "Loading weather data…"}
-        </div>
-      </div>
-    );
-  }
-
   function renderNavbar() {
     return (
       <header className="navbar">
@@ -513,7 +545,7 @@ function App() {
         />
         <div className="nav-right">
           <div className="datetime">{currentTime.toLocaleString()}</div>
-          <button type="button" className="nav-icon-btn" onClick={() => setTutorialOpen(true)} title="Help">
+          <button type="button" className="nav-icon-btn" onClick={() => setTutorialOpen(true)}>
             ? Help
           </button>
           <button type="button" className="nav-icon-btn" onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}>
@@ -523,6 +555,32 @@ function App() {
       </header>
     );
   }
+
+  if (!displayWeather) {
+    return (
+      <div className="app">
+        {renderNavbar()}
+        <div className="app-status">
+          {error ? `⚠ ${error}` : "Loading weather data…"}
+        </div>
+      </div>
+    );
+  }
+
+  // Build metric cards — including wave height
+  const metricCards = [
+    { key: "humidity", label: "Humidity", value: `${displayWeather.humidity}%` },
+    { key: "visibility", label: "Visibility", value: `${displayWeather.visibility.toFixed(1)} km` },
+    { key: "pressure", label: "Pressure", value: `${displayWeather.pressure} hPa` },
+    { key: "wind", label: "Wind", value: `${msToKnots(displayWeather.windMs).toFixed(1)} kn` },
+    { key: "windDirection", label: "Direction", value: displayWeather.windDirection },
+    { key: "precipitation", label: "Precip.", value: `${displayWeather.precipitation} mm` },
+    {
+      key: "waveHeight",
+      label: "Wave Ht.",
+      value: displayWeather.waveHeight != null ? `${displayWeather.waveHeight.toFixed(2)} m` : "N/A",
+    },
+  ];
 
   return (
     <div className="app">
@@ -567,14 +625,7 @@ function App() {
             </div>
             <div className="weather-description">{displayWeather.description}</div>
             <div className="metrics">
-              {[
-                { key: "humidity", label: "Humidity", value: `${displayWeather.humidity}%`, hint: "click for history" },
-                { key: "visibility", label: "Visibility", value: `${displayWeather.visibility.toFixed(1)} km`, hint: "click for history" },
-                { key: "pressure", label: "Pressure", value: `${displayWeather.pressure} hPa`, hint: "click for history" },
-                { key: "wind", label: "Wind", value: `${msToKnots(displayWeather.windMs).toFixed(1)} kn`, hint: "click for history" },
-                { key: "windDirection", label: "Direction", value: displayWeather.windDirection, hint: "click for history" },
-                { key: "precipitation", label: "Precip.", value: `${displayWeather.precipitation} mm`, hint: "click for history" },
-              ].map(({ key, label, value, hint }) => (
+              {metricCards.map(({ key, label, value }) => (
                 <button
                   key={key}
                   type="button"
@@ -584,7 +635,7 @@ function App() {
                 >
                   <p className="metric-label">{label}</p>
                   <p className="metric-value">{value}</p>
-                  <p className="metric-hint">{hint}</p>
+                  <p className="metric-hint">tap for history</p>
                 </button>
               ))}
             </div>
@@ -599,11 +650,39 @@ function App() {
             {displayWeather.status}
           </div>
           <p className="recommendation-text">{displayWeather.recommendation}</p>
+
+          {/* Confidence with breakdown */}
+          <div className="confidence-block">
+            <div className="confidence-header">
+              <span>Confidence</span>
+              <strong>{displayWeather.confidence}%</strong>
+            </div>
+            <div className="confidence-bar-track">
+              <div
+                className={`confidence-bar-fill ${displayWeather.statusClass}`}
+                style={{ width: `${displayWeather.confidence}%` }}
+              />
+            </div>
+            {displayWeather.confidenceFactors?.length > 0 && (
+              <ul className="confidence-factors">
+                {displayWeather.confidenceFactors.map((f, i) => (
+                  <li key={i}>⚠ {f}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <ul className="rec-list">
             <li><span>Wind</span><strong>{msToKnots(displayWeather.windMs).toFixed(1)} kn ({displayWeather.windDirection})</strong></li>
             <li><span>Visibility</span><strong>{displayWeather.visibility.toFixed(1)} km</strong></li>
             <li><span>Precipitation</span><strong>{displayWeather.precipitation} mm</strong></li>
-            <li><span>Confidence</span><strong>{displayWeather.confidence}%</strong></li>
+            <li>
+              <span>Wave Height</span>
+              <strong>{displayWeather.waveHeight != null ? `${displayWeather.waveHeight.toFixed(2)} m` : "N/A"}</strong>
+            </li>
+            {displayWeather.wavePeriod != null && (
+              <li><span>Wave Period</span><strong>{displayWeather.wavePeriod.toFixed(1)} s</strong></li>
+            )}
             <li><span>Updated</span><strong style={{ fontSize: 11 }}>{displayWeather.updatedAt}</strong></li>
             {tide?.data?.length > 0 ? (
               <>
@@ -615,7 +694,6 @@ function App() {
                     {new Date(tide.data[0].time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </strong>
                 </li>
-                <li><span>Tide Source</span><strong>{tide.cacheStatus}</strong></li>
               </>
             ) : (
               <li><span>Tide</span><strong>Unavailable</strong></li>
@@ -665,17 +743,29 @@ function App() {
           selectedArrival={selectedArrival}
           setSelectedArrival={setSelectedArrival}
         />
+
         {/* Operational Limits */}
         <section className="limits-panel">
           <h1>Operational Limits</h1>
           <div className="limits-grid">
             <div className="limit-item">
-              <label>Max Wind (knots)</label>
+              <label>Max Wind Speed (kn)</label>
               <input
                 type="number"
                 value={windMaxInput}
-                onChange={(e) => setWindMaxInput(e.target.value)}
+                placeholder="e.g. 12"
                 min="0"
+                onChange={(e) => setWindMaxInput(Math.max(0, Number(e.target.value)))}
+              />
+            </div>
+            <div className="limit-item">
+              <label>Max Wind Gust (kn)</label>
+              <input
+                type="number"
+                value={windGustMaxInput}
+                placeholder="e.g. 18"
+                min="0"
+                onChange={(e) => setWindGustMaxInput(Math.max(0, Number(e.target.value)))}
               />
             </div>
             <div className="limit-item">
@@ -683,8 +773,9 @@ function App() {
               <input
                 type="number"
                 value={visibilityMinInput}
-                onChange={(e) => setVisibilityMinInput(e.target.value)}
+                placeholder="e.g. 3"
                 min="0"
+                onChange={(e) => setVisibilityMinInput(Math.max(0, Number(e.target.value)))}
               />
             </div>
             <div className="limit-item">
@@ -692,13 +783,25 @@ function App() {
               <input
                 type="number"
                 value={precipitationMaxInput}
-                onChange={(e) => setPrecipitationMaxInput(e.target.value)}
+                placeholder="e.g. 8"
                 min="0"
+                onChange={(e) => setPrecipitationMaxInput(Math.max(0, Number(e.target.value)))}
+              />
+            </div>
+            <div className="limit-item">
+              <label>Max Wave Height (m)</label>
+              <input
+                type="number"
+                value={waveMaxInput}
+                placeholder="e.g. 2.5"
+                min="0"
+                step="0.1"
+                onChange={(e) => setWaveMaxInput(Math.max(0, Number(e.target.value)))}
               />
             </div>
           </div>
-          <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 14, marginBottom: 0 }}>
-            Thresholds are applied to the safety assessment and forecast immediately. Adjust to match your port's pilotage directions.
+          <p className="limits-note">
+            Thresholds update the safety assessment immediately. Set values to match your port's pilotage directions. All values must be greater than 0.
           </p>
         </section>
       </div>
@@ -740,15 +843,8 @@ function App() {
         </div>
       )}
 
-      {/* Share Modal */}
-      {shareOpen && (
-        <ShareModal weather={displayWeather} tide={tide} onClose={() => setShareOpen(false)} />
-      )}
-
-      {/* Report Modal */}
-      {reportOpen && (
-        <ReportModal onClose={() => setReportOpen(false)} />
-      )}
+      {shareOpen && <ShareModal weather={displayWeather} tide={tide} onClose={() => setShareOpen(false)} />}
+      {reportOpen && <ReportModal onClose={() => setReportOpen(false)} />}
     </div>
   );
 }
