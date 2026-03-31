@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { getWeather } from "./services/weatherAPI";
 import { getTide } from "./services/tideAPI";
 import { getForecast } from "./services/forecastAPI";
+import { getConditionHistory } from "./services/weatherHistoryAPI";
 import { calculateSafetyStatus } from "./utils/safetyLogic";
 import { msToKnots } from "./utils/unitConversion";
 import ForecastPanel from "./components/ForecastPanel";
@@ -30,6 +31,38 @@ function getDangerousPeriods(forecast) {
   }));
 }
 
+const conditionLabels = {
+  humidity: "Humidity",
+  visibility: "Visibility",
+  pressure: "Air Pressure",
+  wind: "Wind",
+  windDirection: "Wind Direction",
+  precipitation: "Precipitation",
+};
+
+function formatHistoryValue(conditionKey, value) {
+  if (value == null || Number.isNaN(value)) {
+    return "N/A";
+  }
+
+  switch (conditionKey) {
+    case "humidity":
+      return `${Math.round(value)}%`;
+    case "visibility":
+      return `${(value / 1000).toFixed(1)} km`;
+    case "pressure":
+      return `${Math.round(value)} hPa`;
+    case "wind":
+      return `${(value / 1.852).toFixed(1)} kn`;
+    case "windDirection":
+      return `${getCompassDirection(value)} (${Math.round(value)}°)`;
+    case "precipitation":
+      return `${value.toFixed(1)} mm`;
+    default:
+      return `${value}`;
+  }
+}
+
 function App() {
   const [weather, setWeather] = useState(null);
   const [tide, setTide] = useState(null);
@@ -40,6 +73,12 @@ function App() {
   const [error, setError] = useState("");
   const [selectedArrival, setSelectedArrival] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedCondition, setSelectedCondition] = useState("");
+  const [conditionHistory, setConditionHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [historyCache, setHistoryCache] = useState({});
   const [theme, setTheme] = useState(() => {
     const savedTheme = localStorage.getItem("theme");
     if (savedTheme === "light" || savedTheme === "dark") {
@@ -94,6 +133,19 @@ function App() {
     document.documentElement.classList.add(theme === "dark" ? "theme-dark" : "theme-light");
     localStorage.setItem("theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!historyModalOpen) return;
+
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") {
+        setHistoryModalOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [historyModalOpen]);
 
   const loadWeather = useCallback(async () => {
     try {
@@ -205,6 +257,11 @@ function App() {
     setTide(null);
     setForecast([]);
     setSelectedArrival("");
+    setHistoryModalOpen(false);
+    setSelectedCondition("");
+    setConditionHistory([]);
+    setHistoryError("");
+    setHistoryCache({});
 
     loadWeather();
     loadForecast();
@@ -233,6 +290,41 @@ function App() {
     if (!weather || weather.lat == null || weather.lon == null) return;
     loadTide(weather.lat, weather.lon);
   }, [weather?.lat, weather?.lon, loadTide]);
+
+  const handleOpenHistory = async (conditionKey) => {
+    if (!weather || weather.lat == null || weather.lon == null) return;
+
+    setSelectedCondition(conditionKey);
+    setHistoryModalOpen(true);
+    setHistoryError("");
+
+    const cacheKey = `${weather.lat},${weather.lon}:${conditionKey}`;
+    if (historyCache[cacheKey]) {
+      setConditionHistory(historyCache[cacheKey]);
+      return;
+    }
+
+    setConditionHistory([]);
+    setHistoryLoading(true);
+
+    try {
+      const data = await getConditionHistory(
+        weather.lat,
+        weather.lon,
+        conditionKey
+      );
+      setConditionHistory(data);
+      setHistoryCache((prev) => ({
+        ...prev,
+        [cacheKey]: data,
+      }));
+    } catch (err) {
+      console.error("Condition history fetch error:", err);
+      setHistoryError("Unable to load 24-hour history right now.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   if (!weather) {
     return (
@@ -279,37 +371,61 @@ function App() {
             <div className="weather-description">{weather.description}</div>
 
             <div className="metrics">
-              <div>
+              <button
+                type="button"
+                className="metric-button"
+                onClick={() => handleOpenHistory("humidity")}
+              >
                 <p className="metric-label">HUMIDITY</p>
                 <p className="metric-value">{weather.humidity}%</p>
-              </div>
+              </button>
 
-              <div>
+              <button
+                type="button"
+                className="metric-button"
+                onClick={() => handleOpenHistory("visibility")}
+              >
                 <p className="metric-label">VISIBILITY</p>
                 <p className="metric-value">{weather.visibility.toFixed(1)} km</p>
-              </div>
+              </button>
 
-              <div>
+              <button
+                type="button"
+                className="metric-button"
+                onClick={() => handleOpenHistory("pressure")}
+              >
                 <p className="metric-label">AIR PRESSURE</p>
                 <p className="metric-value">{weather.pressure} hPa</p>
-              </div>
+              </button>
 
-              <div>
+              <button
+                type="button"
+                className="metric-button"
+                onClick={() => handleOpenHistory("wind")}
+              >
                 <p className="metric-label">WIND</p>
                 <p className="metric-value">
                   {msToKnots(weather.windMs).toFixed(1)} kn
                 </p>
-              </div>
+              </button>
 
-              <div>
+              <button
+                type="button"
+                className="metric-button"
+                onClick={() => handleOpenHistory("windDirection")}
+              >
                 <p className="metric-label">WIND DIRECTION</p>
                 <p className="metric-value">{weather.windDirection}</p>
-              </div>
+              </button>
 
-              <div>
+              <button
+                type="button"
+                className="metric-button"
+                onClick={() => handleOpenHistory("precipitation")}
+              >
                 <p className="metric-label">PRECIPITATION</p>
                 <p className="metric-value">{weather.precipitation} mm</p>
-              </div>
+              </button>
             </div>
           </div>
         </section>
@@ -362,6 +478,63 @@ function App() {
           </p>
         </aside>
       </main>
+
+      {historyModalOpen && (
+        <div
+          className="history-modal-overlay"
+          role="presentation"
+          onClick={() => setHistoryModalOpen(false)}
+        >
+          <section
+            className="history-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Weather condition history"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="history-modal-header">
+              <h2>
+                {conditionLabels[selectedCondition] || "Condition"} History
+                (Last 24 Hours)
+              </h2>
+              <button
+                type="button"
+                className="history-close"
+                onClick={() => setHistoryModalOpen(false)}
+                aria-label="Close history panel"
+              >
+                ×
+              </button>
+            </div>
+
+            {historyLoading && <p>Loading history...</p>}
+
+            {!historyLoading && historyError && <p>{historyError}</p>}
+
+            {!historyLoading && !historyError && conditionHistory.length === 0 && (
+              <p>No historical data found for this condition.</p>
+            )}
+
+            {!historyLoading && !historyError && conditionHistory.length > 0 && (
+              <div className="history-list">
+                {conditionHistory.map((entry) => (
+                  <div key={entry.time} className="history-row">
+                    <span>
+                      {new Date(entry.time).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    <strong>
+                      {formatHistoryValue(selectedCondition, entry.value)}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
       <section className="risk-panel">
         <h1>Operational Risk Outlook</h1>
