@@ -106,15 +106,16 @@ function TutorialModal({ onClose }) {
       <div className="tutorial-card">
         <div className="tutorial-icon">⚓</div>
         <h2>Welcome to Port Weather Assist</h2>
-        <p>Decision support for harbour masters. Here's how to use the app:</p>
+        <p>Decision support for Harbour Masters. Here's how to use the app:</p>
         <div className="tutorial-steps">
           {[
             { title: "Search your port", desc: "Type a location in the search bar and press Enter to load live weather data." },
             { title: "Read the safety status", desc: "The Recommendation panel shows SAFE, MODERATE, or DANGEROUS based on current conditions." },
             { title: "Inspect metrics", desc: "Click any metric card (humidity, wind, wave height, etc.) to view its 24-hour history." },
-            { title: "Check the forecast", desc: "Scroll down to see the 24-hour forecast and risk outlook timeline." },
-            { title: "Set arrival time", desc: "Use the Arrival Assessment panel to check safety for a specific ship arrival time." },
-            { title: "Adjust limits", desc: "Customise wind, visibility, wave and precipitation thresholds in Operational Limits to match your port's pilotage directions." },
+            { title: "Navigation and risk timeline", desc: "Scroll down to see the risk timeline and navigate using the tabs above the dashboard" },
+            { title: "Forecast", desc: "In the 'Forecast' tab, view the 24-hour forecast for your location." },
+            { title: "Set arrival time", desc: "In the 'Panel' tab, use the Arrival Assessment panel to check safety for a specific ship arrival time." },
+            { title: "Adjust limits", desc: "In the 'Panel' tab, customise wind, visibility, wave and precipitation thresholds in Operational Limits to match your port's pilotage directions." },
           ].map((step, i) => (
             <div className="tutorial-step" key={i}>
               <div className="tutorial-step-num">{i + 1}</div>
@@ -1026,7 +1027,7 @@ function App() {
 
           <p className="disclaimer">
             Decision support only. All recommendations are based on predictions and are not 100% accurate.
-            Final operational judgement remains with the harbour master.
+            Final operational judgement remains with the Harbour Master.
           </p>
         </aside>
       </main>}
