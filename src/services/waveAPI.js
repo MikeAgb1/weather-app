@@ -11,6 +11,8 @@
  * operations and pilotage directions.
  */
 
+import axios from "axios";
+
 /**
  * Retrieves current wave height, direction, and period for a lat/lon position.
  *
@@ -32,16 +34,24 @@ export async function getWaveData(lat, lon) {
     `&current=wave_height,wave_direction,wave_period` +
     `&wind_speed_unit=ms`;
 
-  const response = await fetch(url);
-  const data = await response.json();
+  try {
+    const response = await axios.get(url);
+    const data = response.data;
 
-  if (!response.ok || data.error) {
-    throw new Error(data.reason || "Failed to load wave data.");
+    if (data.error) {
+      throw new Error(data.reason || "Failed to load wave data.");
+    }
+
+    return {
+      waveHeight:    data.current?.wave_height    ?? null,
+      waveDirection: data.current?.wave_direction ?? null,
+      wavePeriod:    data.current?.wave_period    ?? null,
+    };
+  } catch (error) {
+    const message = axios.isAxiosError(error)
+      ? error.response?.data?.reason || error.response?.data?.message || error.message
+      : error.message;
+
+    throw new Error(message || "Failed to load wave data.");
   }
-
-  return {
-    waveHeight:    data.current?.wave_height    ?? null,
-    waveDirection: data.current?.wave_direction ?? null,
-    wavePeriod:    data.current?.wave_period    ?? null,
-  };
 }
