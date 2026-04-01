@@ -618,6 +618,37 @@ body {
   margin-bottom: 8px;
 }
 
+.arrival-search {
+  width: 100%;
+  max-width: 340px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--app-text);
+  font-size: 14px;
+  margin-bottom: 8px;
+  font-family: 'IBM Plex Sans', Arial, sans-serif;
+}
+
+.arrival-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.arrival-meta {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--muted-text);
+}
+
+.arrival-error {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dangerous-color);
+}
+
 .arrival-select {
   width: 100%;
   max-width: 340px;
