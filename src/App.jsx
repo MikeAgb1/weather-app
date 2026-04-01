@@ -325,6 +325,13 @@ function App() {
   const [city, setCity] = useState(() => localStorage.getItem("lastCity") || "London");
   const [error, setError] = useState("");
   const [selectedArrival, setSelectedArrival] = useState(""); // Chosen slot in ArrivalChecker
+    const [arrivalCity, setArrivalCity] = useState(
+      () => localStorage.getItem("arrivalLastCity") || localStorage.getItem("lastCity") || "London"
+    );
+    const [arrivalForecast, setArrivalForecast] = useState([]); // Forecast data used only by ArrivalChecker
+    const [arrivalLocation, setArrivalLocation] = useState("");
+    const [arrivalError, setArrivalError] = useState("");
+    const [arrivalIsFetching, setArrivalIsFetching] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date()); // Live clock updated every second
   const [page, setPage] = useState("dashboard");              // Active page tab
 
@@ -411,6 +418,11 @@ function App() {
     localStorage.setItem("lastCity", city);
   }, [city]);
 
+  // Keep the planning search independent from the navbar search.
+  useEffect(() => {
+    localStorage.setItem("arrivalLastCity", arrivalCity);
+  }, [arrivalCity]);
+
   // Escape closes modals
   useEffect(() => {
     const handler = (e) => {
@@ -469,6 +481,13 @@ function App() {
     if (e.key === "Enter" && e.target.value.trim()) {
       setCity(e.target.value.trim());
     }
+  };
+
+  /** Submits the planning panel's location search. */
+  const handleArrivalCitySearch = (value) => {
+    if (!value.trim()) return;
+    setSelectedArrival("");
+    setArrivalCity(value.trim());
   };
 
   // ── Data loaders ──────────────────────────────────────────────────────────
@@ -571,6 +590,45 @@ function App() {
     }
   }, [isOffline]);
 
+  // Loads forecast data for the planning panel's own city selection.
+  const loadArrivalForecast = useCallback(async () => {
+    if (isOffline) return;
+    setArrivalIsFetching(true);
+    try {
+      setArrivalError("");
+
+      const data = await getWeather(arrivalCity);
+      const lat = data.coord?.lat;
+      const lon = data.coord?.lon;
+
+      if (lat == null || lon == null) {
+        throw new Error("Coordinates unavailable for selected arrival location.");
+      }
+
+      const items = await getHourlyForecast(lat, lon);
+      setArrivalForecast(
+        items.map((item) => {
+          const slotSafety = calculateSafetyStatus(item.windMs, item.visibility, item.precipitation, item.waveHeight);
+          return {
+            ...item,
+            status: slotSafety.status,
+            statusClass: slotSafety.statusClass,
+            reason: slotSafety.reason,
+            confidence: slotSafety.confidence,
+          };
+        })
+      );
+      setArrivalLocation(data.name || arrivalCity);
+    } catch (err) {
+      console.error("Arrival forecast fetch error:", err);
+      setArrivalForecast([]);
+      setArrivalLocation("");
+      setArrivalError("Location not found. Please try another city.");
+    } finally {
+      setArrivalIsFetching(false);
+    }
+  }, [arrivalCity, isOffline]);
+
   /**
    * Fetches the next 24 hours of tidal extremes from Stormglass.
    * Wrapped in its own callback so the caller (lat/lon effect) can pass coordinates
@@ -634,6 +692,11 @@ function App() {
     setHistoryCache({});
     loadWeather();
   }, [city, loadWeather]);
+
+  // Refresh planning-panel forecast when its local search location changes.
+  useEffect(() => {
+    loadArrivalForecast();
+  }, [loadArrivalForecast]);
 
   // Auto-refresh current conditions every 10 minutes.
   useEffect(() => {
@@ -997,9 +1060,14 @@ function App() {
       {page === "planning" && (
         <div className="bottom-panels">
           <ArrivalChecker
-            forecast={forecast}
+            forecast={arrivalForecast}
             selectedArrival={selectedArrival}
             setSelectedArrival={setSelectedArrival}
+            arrivalCity={arrivalCity}
+            arrivalLocation={arrivalLocation}
+            arrivalError={arrivalError}
+            arrivalIsFetching={arrivalIsFetching}
+            onArrivalCitySearch={handleArrivalCitySearch}
           />
 
           <section className="limits-panel">
