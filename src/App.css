@@ -691,7 +691,7 @@ body {
   margin-bottom: 6px;
 }
 
-.limit-item input, .resetButton {
+.limit-item input{
   width: 100%;
   padding: 10px 14px;
   border-radius: 10px;
@@ -702,7 +702,7 @@ body {
   font-family: 'IBM Plex Mono', monospace;
   transition: border-color 0.2s;
 }
-.limit-item input:focus , .resetButton:active{
+.limit-item input:focus{
   outline: none;
   border-color: var(--accent);
 }
