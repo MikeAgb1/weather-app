@@ -10,6 +10,8 @@
  * sparkline chart and reading list in the history modal.
  */
 
+import axios from "axios";
+
 /**
  * Maps the app's internal condition keys to the field names expected by
  * the respective Open-Meteo API endpoints.
@@ -76,27 +78,35 @@ export async function getConditionHistory(lat, lon, conditionKey) {
       `&timezone=auto`;
   }
 
-  const response = await fetch(url);
-  const data     = await response.json();
+  try {
+    const response = await axios.get(url);
+    const data     = response.data;
 
-  if (!response.ok) {
-    throw new Error(data?.reason || "Failed to load condition history.");
+    if (data.error) {
+      throw new Error(data?.reason || "Failed to load condition history.");
+    }
+
+    const times  = data?.hourly?.time         || [];
+    const values = data?.hourly?.[hourlyField] || [];
+    const cutoff = now.getTime() - 24 * 60 * 60 * 1000;
+
+    // Filter to the exact 24-hour window and discard null/NaN readings.
+    return times
+      .map((time, index) => ({ time, value: values[index] }))
+      .filter((item) => {
+        const timeMs = new Date(item.time).getTime();
+        return (
+          item.value !== null &&
+          !Number.isNaN(item.value) &&
+          timeMs >= cutoff &&
+          timeMs <= now.getTime()
+        );
+      });
+  } catch (error) {
+    const message = axios.isAxiosError(error)
+      ? error.response?.data?.reason || error.response?.data?.message || error.message
+      : error.message;
+
+    throw new Error(message || "Failed to load condition history.");
   }
-
-  const times  = data?.hourly?.time         || [];
-  const values = data?.hourly?.[hourlyField] || [];
-  const cutoff = now.getTime() - 24 * 60 * 60 * 1000;
-
-  // Filter to the exact 24-hour window and discard null/NaN readings.
-  return times
-    .map((time, index) => ({ time, value: values[index] }))
-    .filter((item) => {
-      const timeMs = new Date(item.time).getTime();
-      return (
-        item.value !== null &&
-        !Number.isNaN(item.value) &&
-        timeMs >= cutoff &&
-        timeMs <= now.getTime()
-      );
-    });
 }

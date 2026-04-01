@@ -11,6 +11,8 @@
  * in the compiled bundle.
  */
 
+import axios from "axios";
+
 /**
  * Retrieves tidal extremes (high and low tides) for the next 24 hours.
  * Returns cached data if a valid cache entry exists to conserve API quota.
@@ -64,13 +66,13 @@ export async function getTide(lat, lon) {
     `&datum=MSL`; // Mean Sea Level datum — standard for port operations
 
   try {
-    const response = await fetch(url, {
+    const response = await axios.get(url, {
       headers: { Authorization: API_KEY },
     });
 
-    const data = await response.json();
+    const data = response.data;
 
-    if (!response.ok) {
+    if (data?.error) {
       // Cache the failure so the app does not retry within the same window,
       // which would waste more of the daily quota.
       localStorage.setItem(cacheKey, JSON.stringify({
@@ -92,7 +94,11 @@ export async function getTide(lat, lon) {
     return { ...data, cacheStatus: "live", cachedAt: timestamp };
 
   } catch (error) {
-    console.error("Stormglass request failed:", error.message);
+    const message = axios.isAxiosError(error)
+      ? error.response?.data?.errors?.[0]?.message || error.response?.data?.message || error.message
+      : error.message;
+
+    console.error("Stormglass request failed:", message);
 
     // Return an empty result rather than crashing the app — tide data is
     // supplementary; the safety assessment can still run without it.
@@ -100,7 +106,7 @@ export async function getTide(lat, lon) {
       data: [],
       cacheStatus: "error",
       cachedAt: Date.now(),
-      error: error.message,
+      error: message,
     };
   }
 }

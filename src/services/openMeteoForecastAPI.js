@@ -12,6 +12,8 @@
  * by setting wave fields to null rather than crashing the forecast.
  */
 
+import axios from "axios";
+
 // ── WMO weather code helpers ────────────────────────────────────────────────
 
 /**
@@ -104,13 +106,13 @@ function wmoToDescription(code) {
 export async function getHourlyForecast(lat, lon) {
   // Fire both requests simultaneously — marine failure is non-fatal.
   const [weatherSettled, marineSettled] = await Promise.allSettled([
-    fetch(
+    axios.get(
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${lat}&longitude=${lon}` +
       `&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,precipitation,visibility,weathercode` +
       `&forecast_days=2&wind_speed_unit=ms&timezone=auto`
     ),
-    fetch(
+    axios.get(
       `https://marine-api.open-meteo.com/v1/marine` +
       `?latitude=${lat}&longitude=${lon}` +
       `&hourly=wave_height,wave_direction,wave_period` +
@@ -123,15 +125,15 @@ export async function getHourlyForecast(lat, lon) {
     throw new Error("Failed to load hourly forecast.");
   }
 
-  const weatherData = await weatherSettled.value.json();
-  if (!weatherSettled.value.ok || weatherData.error) {
+  const weatherData = weatherSettled.value.data;
+  if (weatherData.error) {
     throw new Error(weatherData.reason || "Failed to load hourly forecast.");
   }
 
   // Marine data is optional — null if unavailable (e.g. inland city).
   const marineData =
-    marineSettled.status === "fulfilled" && marineSettled.value.ok
-      ? await marineSettled.value.json()
+    marineSettled.status === "fulfilled" && !marineSettled.value.data?.error
+      ? marineSettled.value.data
       : null;
 
   const { hourly }    = weatherData;

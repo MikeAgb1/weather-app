@@ -8,6 +8,8 @@
  * OWM forecast tier.  This file is kept for reference and as a fallback.
  */
 
+import axios from "axios";
+
 /**
  * Retrieves a 5-day forecast in 3-hour intervals for a named city.
  *
@@ -28,12 +30,14 @@ export async function getForecast(city) {
     `&units=metric` +
     `&appid=${API_KEY}`;
 
-  const response = await fetch(url);
-  const data = await response.json();
+  try {
+    const response = await axios.get(url);
+    return response.data;
+  } catch (error) {
+    const message = axios.isAxiosError(error)
+      ? error.response?.data?.message
+      : null;
 
-  if (!response.ok) {
-    throw new Error(data?.message || "Failed to load forecast data.");
+    throw new Error(message || "Failed to load forecast data.");
   }
-
-  return data;
 }

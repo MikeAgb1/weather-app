@@ -9,6 +9,8 @@
  * Wind is later converted to knots in App.jsx via msToKnots().
  */
 
+import axios from "axios";
+
 /**
  * Retrieves current weather data for a named city.
  *
@@ -30,13 +32,15 @@ export async function getWeather(city) {
     `&units=metric` +
     `&appid=${API_KEY}`;
 
-  const response = await fetch(url);
-  const data = await response.json();
+  try {
+    const response = await axios.get(url);
+    return response.data;
+  } catch (error) {
+    const message = axios.isAxiosError(error)
+      ? error.response?.data?.message
+      : null;
 
-  // OWM returns HTTP 404 for unknown cities and 401 for bad keys.
-  if (!response.ok) {
-    throw new Error(data?.message || "Failed to load weather data.");
+    // OWM returns HTTP 404 for unknown cities and 401 for bad keys.
+    throw new Error(message || "Failed to load weather data.");
   }
-
-  return data;
 }
