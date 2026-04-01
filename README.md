@@ -1,3 +1,7 @@
+## Running the folder
+
+To run the folder, you need to install Node.js, and use the Command Prompt (not the powershell as it blocks certain commands) and navigate to the folder path. Then run 'npm install' and then 'npm run dev' to run the app, visit the link provided (usually http://localhost:5173/) to load the web page.
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
@@ -14,3 +18,5 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+
