@@ -136,71 +136,21 @@ function TutorialModal({ onClose }) {
 }
 
 /* ─── Share Modal ──────────────────────────────────────────────────────────
- * Generates a plain-text conditions report that can be copied to the
- * clipboard and pasted into log systems or shared with crew.
+ * Exports a lossless PNG snapshot of current conditions + recommendation.
  * ─────────────────────────────────────────────────────────────────────────── */
-function ShareModal({ weather, tide, onClose }) {
-  const [copied, setCopied] = useState(false);
-  const timestamp = new Date().toLocaleString();
-
-  const text = [
-    "PORT WEATHER ASSIST — CONDITIONS REPORT",
-    `Location:      ${weather.location}`,
-    `Time:          ${timestamp}`,
-    `Status:        ${weather.status} (Confidence: ${weather.confidence}%)`,
-    "─".repeat(42),
-    `Temperature:   ${weather.temperature.toFixed(1)}°C`,
-    `Wind:          ${msToKnots(weather.windMs).toFixed(1)} kn (${weather.windDirection})`,
-    `Visibility:    ${weather.visibility.toFixed(1)} km`,
-    `Precipitation: ${weather.precipitation} mm`,
-    `Humidity:      ${weather.humidity}%`,
-    `Pressure:      ${weather.pressure} hPa`,
-    weather.waveHeight != null
-      ? `Wave Height:   ${weather.waveHeight.toFixed(2)} m`
-      : `Wave Height:   Unavailable`,
-    tide?.data?.length
-      ? `Next Tide:     ${tide.data[0].type.toUpperCase()} at ${new Date(tide.data[0].time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-      : "Tide:          Unavailable",
-    "─".repeat(42),
-    `Note: ${weather.recommendation}`,
-    "All recommendations are decision support only. Final operational judgement remains with the harbour master.",
-  ].join("\n");
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
+function ShareModal({ onClose, onExport, isExporting, exportError }) {
   return (
     <div className="share-modal-overlay" onClick={onClose}>
       <div className="share-modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Share Conditions</h2>
-        <p>Copy a plain-text conditions report to share with crew or log systems.</p>
-        <div className="share-preview">
-          <div className="sp-title">⚓ PORT WEATHER ASSIST</div>
-          <div className={`sp-status ${weather.statusClass}`}>{weather.status}</div>
-          <div style={{ marginBottom: 10, fontSize: 11, opacity: 0.6 }}>{weather.location} · {timestamp}</div>
-          {[
-            ["Wind", `${msToKnots(weather.windMs).toFixed(1)} kn (${weather.windDirection})`],
-            ["Visibility", `${weather.visibility.toFixed(1)} km`],
-            ["Precipitation", `${weather.precipitation} mm`],
-            ["Wave Height", weather.waveHeight != null ? `${weather.waveHeight.toFixed(2)} m` : "N/A"],
-            ["Humidity", `${weather.humidity}%`],
-            ["Pressure", `${weather.pressure} hPa`],
-            ["Confidence", `${weather.confidence}%`],
-          ].map(([label, value]) => (
-            <div className="sp-row" key={label}>
-              <span className="sp-label">{label}</span>
-              <span>{value}</span>
-            </div>
-          ))}
-        </div>
+        <h2>Export Conditions Image</h2>
+        <p>
+          Create a PNG snapshot of the Current Conditions and Recommendation panels exactly as shown on the dashboard.
+        </p>
+        {exportError && <p className="share-error">⚠ {exportError}</p>}
         <div className="share-actions">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleCopy}>
-            {copied ? "✓ Copied!" : "Copy to Clipboard"}
+          <button className="btn btn-primary" onClick={onExport} disabled={isExporting}>
+            {isExporting ? "Exporting..." : "Export PNG"}
           </button>
         </div>
       </div>
@@ -345,6 +295,8 @@ function App() {
 
   // ── Other modal flags ─────────────────────────────────────────────────────
   const [shareOpen, setShareOpen] = useState(false);
+  const [shareExporting, setShareExporting] = useState(false);
+  const [shareExportError, setShareExportError] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
 
@@ -375,6 +327,7 @@ function App() {
   // latLonRef stores the most recent coordinates so callbacks that don't depend
   // on weather state (timers, limit effects) can still trigger geo-based fetches.
   const latLonRef = useRef({ lat: null, lon: null });
+  const dashboardCaptureRef = useRef(null);
 
   // prevLimits tracks the last-applied limit values to avoid re-running the
   // safety calculation when an unrelated state update re-renders the component.
@@ -753,6 +706,42 @@ function App() {
     }
   };
 
+  const handleExportConditionsImage = async () => {
+    const node = dashboardCaptureRef.current;
+    if (!node) {
+      setShareExportError("Unable to capture panels right now. Please try again.");
+      return;
+    }
+
+    setShareExportError("");
+    setShareExporting(true);
+    try {
+      const { toPng } = await import("html-to-image");
+      const backgroundColor = getComputedStyle(document.documentElement)
+        .getPropertyValue("--app-bg")
+        .trim() || "#ffffff";
+
+      const dataUrl = await toPng(node, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor,
+      });
+
+      const safeLocation = (displayWeather?.location || city).replace(/[^a-z0-9]+/gi, "_");
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+      const link = document.createElement("a");
+      link.download = `${safeLocation}_conditions_${stamp}.png`;
+      link.href = dataUrl;
+      link.click();
+      setShareOpen(false);
+    } catch (err) {
+      console.error("PNG export failed:", err);
+      setShareExportError("Export failed. Please try again.");
+    } finally {
+      setShareExporting(false);
+    }
+  };
+
   const displayWeather = weather || cachedWeather;
   const [tosOpen, setTosOpen] = useState(false);
 
@@ -908,7 +897,7 @@ function App() {
       {error && !isOffline && <div className="error-banner">⚠ {error}</div>}
 
       {/* ── Dashboard page ── */}
-      {page === "dashboard" && <main className="dashboard">
+      {page === "dashboard" && <main className="dashboard" ref={dashboardCaptureRef}>
         {/* Current Conditions */}
         <section className="conditions-panel">
           <div className="panel-header">
@@ -1161,7 +1150,17 @@ function App() {
         </div>
       )}
 
-      {shareOpen && <ShareModal weather={displayWeather} tide={tide} onClose={() => setShareOpen(false)} />}
+      {shareOpen && (
+        <ShareModal
+          onClose={() => {
+            setShareOpen(false);
+            setShareExportError("");
+          }}
+          onExport={handleExportConditionsImage}
+          isExporting={shareExporting}
+          exportError={shareExportError}
+        />
+      )}
       {reportOpen && <ReportModal onClose={() => setReportOpen(false)} />}
     </div>
   );
