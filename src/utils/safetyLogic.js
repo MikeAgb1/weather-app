@@ -18,7 +18,6 @@ export let windMax = 12;          // Maximum safe sustained wind speed (knots)
 export let visibilityMin = 3;     // Minimum safe visibility (km)
 export let precipitationMax = 8;  // Maximum safe precipitation rate (mm/h)
 export let waveMax = 2.5;         // Maximum safe significant wave height (m)
-export let windGustMax = 18;      // Maximum safe wind gust speed (knots)
 
 // Setter functions — called from App.jsx when the harbour master changes a limit.
 // Using setters keeps the module's state encapsulated.
@@ -26,7 +25,6 @@ export function setWindMax(val)          { windMax = val; }
 export function setVisibilityMin(val)    { visibilityMin = val; }
 export function setPrecipitationMax(val) { precipitationMax = val; }
 export function setWaveMax(val)          { waveMax = val; }
-export function setWindGustMax(val)      { windGustMax = val; }
 
 // ── Main safety assessment ───────────────────────────────────────────────────
 
@@ -79,6 +77,18 @@ export function calculateSafetyStatus(windMs, visibilityKm, precipitationMm = 0,
   if (waveHeightM === null) {
     confidenceScore -= 8;
     factors.push("Wave height data unavailable");
+  }
+  if (precipitationMm === null) {
+    confidenceScore -= 8;
+    factors.push("Precipitaion data unavailable");
+  }
+  if (windKnots === null) {
+    confidenceScore -= 8;
+    factors.push("Wave data unavailable");
+  }
+  if (visibilityKm === null) {
+    confidenceScore -= 8;
+    factors.push("Visibility data unavailable");
   }
 
   // Borderline conditions are harder to call — a small measurement error could
