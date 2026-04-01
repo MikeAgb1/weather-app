@@ -702,13 +702,9 @@ body {
   font-family: 'IBM Plex Mono', monospace;
   transition: border-color 0.2s;
 }
-.limit-item input:focus , .resetButton:hover{
+.limit-item input:focus , .resetButton:active{
   outline: none;
   border-color: var(--accent);
-}
-
-.resetButton:active{
-  background-color: lightgray;
 }
 
 /* ── History Modal ── */
