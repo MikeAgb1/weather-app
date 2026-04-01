@@ -844,6 +844,12 @@ body {
   margin-bottom: 18px;
 }
 
+.share-error {
+  color: var(--dangerous-color) !important;
+  font-weight: 600;
+  margin-top: -4px;
+}
+
 .share-preview {
   background: #1a2744;
   color: white;
