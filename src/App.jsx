@@ -26,12 +26,10 @@ import {
   visibilityMin as defaultVisibilityMin,
   precipitationMax as defaultPrecipitationMax,
   waveMax as defaultWaveMax,
-  windGustMax as defaultWindGustMax,
   setWindMax,
   setVisibilityMin,
   setPrecipitationMax,
   setWaveMax,
-  setWindGustMax,
 } from "./utils/safetyLogic";
 import { msToKnots } from "./utils/unitConversion";
 import ForecastPanel from "./components/ForecastPanel";
@@ -306,13 +304,12 @@ function App() {
   const [isFetching, setIsFetching] = useState(false);      // True while loadWeather is in progress
 
   // ── Operational limits (harbour-master configurable) ──────────────────────
-  // Initialised from safetyLogic defaults; kept in state so inputs are controlled.
-  const [windMaxInput, setWindMaxInput] = useState(defaultWindMax);
-  const [visibilityMinInput, setVisibilityMinInput] = useState(defaultVisibilityMin);
-  const [precipitationMaxInput, setPrecipitationMaxInput] = useState(defaultPrecipitationMax);
-  const [waveMaxInput, setWaveMaxInput] = useState(defaultWaveMax);
-  const [windGustMaxInput, setWindGustMaxInput] = useState(defaultWindGustMax);
-
+  // Initialised from defaults snapshot.
+  const [windMaxInput, setWindMaxInput] = useState(initialLimit.windMax);
+  const [visibilityMinInput, setVisibilityMinInput] = useState(initialLimit.visibilityMin);
+  const [precipitationMaxInput, setPrecipitationMaxInput] = useState(initialLimit.precipitationMax);
+  const [waveMaxInput, setWaveMaxInput] = useState(initialLimit.waveMax);
+  
   // Theme is read from localStorage on mount; falls back to the OS preference.
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem("theme");
@@ -332,7 +329,7 @@ function App() {
   // prevLimits tracks the last-applied limit values to avoid re-running the
   // safety calculation when an unrelated state update re-renders the component.
   const prevLimits = useRef({
-    windMaxInput, visibilityMinInput, precipitationMaxInput, waveMaxInput, windGustMaxInput
+    windMaxInput, visibilityMinInput, precipitationMaxInput, waveMaxInput
   });
 
   // ── One-time effects ──────────────────────────────────────────────────────
@@ -399,27 +396,24 @@ function App() {
       Number(windMaxInput) !== prev.windMaxInput ||
       Number(visibilityMinInput) !== prev.visibilityMinInput ||
       Number(precipitationMaxInput) !== prev.precipitationMaxInput ||
-      Number(waveMaxInput) !== prev.waveMaxInput ||
-      Number(windGustMaxInput) !== prev.windGustMaxInput;
+      Number(waveMaxInput) !== prev.waveMaxInput;
 
     if (changed) {
       setWindMax(Number(windMaxInput));
       setVisibilityMin(Number(visibilityMinInput));
       setPrecipitationMax(Number(precipitationMaxInput));
       setWaveMax(Number(waveMaxInput));
-      setWindGustMax(Number(windGustMaxInput));
       prevLimits.current = {
         windMaxInput: Number(windMaxInput),
         visibilityMinInput: Number(visibilityMinInput),
         precipitationMaxInput: Number(precipitationMaxInput),
         waveMaxInput: Number(waveMaxInput),
-        windGustMaxInput: Number(windGustMaxInput),
       };
       // Only re-fetch if coordinates are known (i.e. a city has already loaded).
       if (latLonRef.current.lat != null) loadForecast();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [windMaxInput, visibilityMinInput, precipitationMaxInput, waveMaxInput, windGustMaxInput]);
+  }, [windMaxInput, visibilityMinInput, precipitationMaxInput, waveMaxInput]);
 
   // Increment the live clock every second for the navbar timestamp display.
   useEffect(() => {
@@ -1068,11 +1062,6 @@ function App() {
                   onChange={(e) => setWindMaxInput(Math.max(0, Number(e.target.value)))} />
               </div>
               <div className="limit-item">
-                <label>Max Wind Gust (kn)</label>
-                <input type="number" value={windGustMaxInput} placeholder="e.g. 18" min="0"
-                  onChange={(e) => setWindGustMaxInput(Math.max(0, Number(e.target.value)))} />
-              </div>
-              <div className="limit-item">
                 <label>Min Visibility (km)</label>
                 <input type="number" value={visibilityMinInput} placeholder="e.g. 3" min="0"
                   onChange={(e) => setVisibilityMinInput(Math.max(0, Number(e.target.value)))} />
@@ -1086,6 +1075,21 @@ function App() {
                 <label>Max Wave Height (m)</label>
                 <input type="number" value={waveMaxInput} placeholder="e.g. 2.5" min="0" step="0.1"
                   onChange={(e) => setWaveMaxInput(Math.max(0, Number(e.target.value)))} />
+              </div>
+              <div className="limit-item">
+                <label><br></br></label>
+                <button
+                  type="button"
+                  className="resetButton"
+                  onClick={() => {
+                    setWindMaxInput(initialLimit.windMax);
+                    setVisibilityMinInput(initialLimit.visibilityMin);
+                    setPrecipitationMaxInput(initialLimit.precipitationMax);
+                    setWaveMaxInput(initialLimit.waveMax);
+                  }}
+                >
+                  Reset values
+                </button>
               </div>
             </div>
             <p className="limits-note">
@@ -1167,3 +1171,9 @@ function App() {
 }
 
 export default App;
+const initialLimit = Object.freeze({
+  windMax: defaultWindMax,
+  visibilityMin: defaultVisibilityMin,
+  precipitationMax: defaultPrecipitationMax,
+  waveMax: defaultWaveMax,
+});
