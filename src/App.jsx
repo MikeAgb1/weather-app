@@ -142,9 +142,9 @@ function ShareModal({ onClose, onExport, isExporting, exportError }) {
   return (
     <div className="share-modal-overlay" onClick={onClose}>
       <div className="share-modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Export Conditions Image</h2>
+        <h2>Export Current Conditions and Risk Assessments?</h2>
         <p>
-          Create a PNG snapshot of the Current Conditions and Recommendation panels exactly as shown on the dashboard.
+        
         </p>
         {exportError && <p className="share-error">⚠ {exportError}</p>}
         <div className="share-actions">
