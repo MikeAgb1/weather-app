@@ -1080,7 +1080,7 @@ function App() {
                 <label><br></br></label>
                 <button
                   type="button"
-                  className="resetButton"
+                  className="btn btn-primary"
                   onClick={() => {
                     setWindMaxInput(initialLimit.windMax);
                     setVisibilityMinInput(initialLimit.visibilityMin);
@@ -1088,7 +1088,7 @@ function App() {
                     setWaveMaxInput(initialLimit.waveMax);
                   }}
                 >
-                  Reset values
+                  ↻ Reset values
                 </button>
               </div>
             </div>
