@@ -1,12 +1,6 @@
 /**
- * weatherAPI.js
- * Fetches real-time weather conditions from the OpenWeatherMap "Current Weather" endpoint.
- *
- * The API key is stored in the .env file as VITE_OPENWEATHER_API_KEY and injected
- * at build time by Vite — it is never exposed in the compiled bundle as a plain string.
- *
- * Units are set to "metric" so temperatures come back in °C and wind in m/s.
- * Wind is later converted to knots in App.jsx via msToKnots().
+ * OpenWeather current conditions client.
+ * Uses metric units (C, m/s) and returns the raw API data
  */
 
 import axios from "axios";
@@ -40,7 +34,7 @@ export async function getWeather(city) {
       ? error.response?.data?.message
       : null;
 
-    // OWM returns HTTP 404 for unknown cities and 401 for bad keys.
+    // Preserve upstream API error text where possible.
     throw new Error(message || "Failed to load weather data.");
   }
 }

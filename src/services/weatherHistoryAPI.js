@@ -1,21 +1,11 @@
 /**
- * weatherHistoryAPI.js
- * Retrieves hourly historical values for a single weather condition over the past 24 hours.
- *
- * Two different Open-Meteo endpoints are used depending on the requested condition:
- *   - Most conditions  → Open-Meteo Archive API  (historical atmospheric data)
- *   - Wave height      → Open-Meteo Marine API   (historical ocean data)
- *
- * Both APIs are free and require no key.  Results are used to populate the
- * sparkline chart and reading list in the history modal.
+ * Open-Meteo historical condition client.
+ * Uses archive data for weather fields and marine data for wave height.
  */
 
 import axios from "axios";
 
-/**
- * Maps the app's internal condition keys to the field names expected by
- * the respective Open-Meteo API endpoints.
- */
+// Maps UI condition keys to Open-Meteo hourly field names.
 const conditionToHourlyField = {
   humidity:      "relative_humidity_2m",
   visibility:    "visibility",
@@ -23,7 +13,7 @@ const conditionToHourlyField = {
   wind:          "wind_speed_10m",
   windDirection: "wind_direction_10m",
   precipitation: "precipitation",
-  waveHeight:    "wave_height",  // routed to the Marine API
+  waveHeight:    "wave_height",
 };
 
 /**
@@ -56,7 +46,7 @@ export async function getConditionHistory(lat, lon, conditionKey) {
   const now       = new Date();
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  // Wave height is served by the Marine API; everything else by the Archive API.
+  // Wave height uses the marine endpoint; all others use archive.
   let url;
   if (conditionKey === "waveHeight") {
     url =
@@ -90,7 +80,7 @@ export async function getConditionHistory(lat, lon, conditionKey) {
     const values = data?.hourly?.[hourlyField] || [];
     const cutoff = now.getTime() - 24 * 60 * 60 * 1000;
 
-    // Filter to the exact 24-hour window and discard null/NaN readings.
+    // Keep only valid points in the exact trailing 24-hour window.
     return times
       .map((time, index) => ({ time, value: values[index] }))
       .filter((item) => {
