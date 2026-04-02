@@ -1,11 +1,6 @@
 /**
- * forecastAPI.js
- * Fetches the 5-day / 3-hourly forecast from the OpenWeatherMap Forecast endpoint.
- *
- * NOTE: This file is no longer used as the primary forecast source.
- * The app switched to Open-Meteo (openMeteoForecastAPI.js) which provides
- * truly hourly data and includes wave height — both unavailable in the free
- * OWM forecast tier.  This file is kept for reference and as a fallback.
+ * Legacy OpenWeather forecast client (5-day, 3-hour intervals).
+ * Kept as a fallback/reference after migrating to Open-Meteo hourly forecast.
  */
 
 import axios from "axios";
@@ -13,8 +8,8 @@ import axios from "axios";
 /**
  * Retrieves a 5-day forecast in 3-hour intervals for a named city.
  *
- * @param {string} city - City name (e.g. "Southampton").
- * @returns {Promise<Object>} Raw OWM response with a `list` array of forecast slots.
+ * @param {string} city - City name
+ * @returns {Promise<Object>} Raw API response with a `list` array of forecast slots.
  * @throws {Error} If the API key is missing or the request fails.
  */
 export async function getForecast(city) {

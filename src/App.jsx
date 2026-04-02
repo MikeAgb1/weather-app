@@ -1,16 +1,6 @@
 /**
- * App.jsx
- * Root component for Port Weather Assist.
- *
- * Responsibilities:
- *  - Fetches and coordinates data from four APIs: OpenWeatherMap (current conditions),
- *    Open-Meteo (hourly forecast + waves), Stormglass (tide extremes), and
- *    Open-Meteo Marine (current wave state).
- *  - Runs the safety assessment (safetyLogic.js) on both current and forecast data.
- *  - Manages all application state: weather, forecast, tides, wave data, UI state,
- *    operational limits, theme, and page navigation.
- *  - Renders three pages (Dashboard / Forecast / Planning) via a tab bar,
- *    plus modal overlays (tutorial, share, report, history).
+ * Sets up necessary dependencies and data for the app
+ * Pulls all CSS, API helpers etc
  */
 
 import "./App.css";
@@ -35,10 +25,9 @@ import { msToKnots } from "./utils/unitConversion";
 import ForecastPanel from "./components/ForecastPanel";
 import ArrivalChecker from "./components/ArrivalChecker";
 
-// ── Utility helpers ──────────────────────────────────────────────────────────
 
 /**
- * Converts a bearing in degrees to an 8-point compass label.
+ * Converts bearing in degrees to 8-point compass label.
  * Used for wind direction and wave direction display.
  * @param {number|null} deg - Bearing in degrees (0 = North).
  * @returns {string} e.g. "NE", "SW", or "N/A" if no data.
@@ -50,7 +39,7 @@ function getCompassDirection(deg) {
 }
 
 /**
- * Extracts forecast slots rated MODERATE or DANGEROUS for the Risk Outlook panel.
+ * Gets forecast slots rated SAFE,MODERATE or DANGEROUS for the Risk Outlook section.
  * @param {Array} forecast - Enriched hourly forecast array.
  * @returns {Array<{ time, status, reason }>}
  */
@@ -60,7 +49,7 @@ function getDangerousPeriods(forecast) {
     .map((item) => ({ time: item.time, status: item.status, reason: item.reason }));
 }
 
-/** Human-readable labels for each metric key used in the history modal title. */
+//Human-readable labels for each weather metric so it looks nicer//
 const conditionLabels = {
   humidity:      "Humidity",
   visibility:    "Visibility",
@@ -92,14 +81,9 @@ function formatHistoryValue(conditionKey, value) {
   }
 }
 
-// ── Modal components ────────────────────────────────────────────────────────
-// Each modal is a self-contained component to keep App() readable.
-// They receive only the props they need and call onClose to dismiss themselves.
+// Modal components are kept local to keep App readable.
 
-/* ─── Tutorial Modal ───────────────────────────────────────────────────────
- * Shown on first visit (localStorage flag "tutorialSeen" not set).
- * Walks the user through the six main features of the app.
- * ─────────────────────────────────────────────────────────────────────────── */
+// Shown once on first visit using a localStorage flag.
 function TutorialModal({ onClose }) {
   return (
     <div className="tutorial-overlay" role="dialog" aria-modal="true">
@@ -134,9 +118,7 @@ function TutorialModal({ onClose }) {
   );
 }
 
-/* ─── Share Modal ──────────────────────────────────────────────────────────
- * Exports a lossless PNG snapshot of current conditions + recommendation.
- * ─────────────────────────────────────────────────────────────────────────── */
+// Exports PNG of current conditions and recommendation.
 function ShareModal({ onClose, onExport, isExporting, exportError }) {
   return (
     <div className="share-modal-overlay" onClick={onClose}>
@@ -157,10 +139,7 @@ function ShareModal({ onClose, onExport, isExporting, exportError }) {
   );
 }
 
-/* ─── Report Modal ──────────────────────────────────────────────────────────
- * Lets users flag data inaccuracies or missing information.
- * Reports are logged to the console (a real deployment would POST to a backend).
- * ─────────────────────────────────────────────────────────────────────────── */
+// Captures user feedback; logs to console though.
 function ReportModal({ onClose }) {
   const [type, setType] = useState("inaccuracy");
   const [details, setDetails] = useState("");
@@ -217,12 +196,7 @@ function ReportModal({ onClose }) {
   );
 }
 
-/* ─── Risk Outlook Slider ───────────────────────────────────────────────────
- * Shows forecast slots rated MODERATE or DANGEROUS as a horizontal slider.
- * Each card displays the time, status label, and the primary reason so the
- * harbour master can see at a glance when and why risk is elevated.
- * Arrow buttons are only rendered when there are risk periods to scroll through.
- * ─────────────────────────────────────────────────────────────────────────── */
+// List of forecast slots with elevated risk.
 function RiskOutlook({ riskPeriods }) {
   const scrollRef = useRef(null);
   const scroll = (dir) => {
@@ -260,82 +234,76 @@ function RiskOutlook({ riskPeriods }) {
   );
 }
 
-/* ─── Main App ──────────────────────────────────────────────────────────────
- * Top-level component that owns all shared state and data-fetching logic.
- * ─────────────────────────────────────────────────────────────────────────── */
+// Top-level component for shared state and data loading.
 function App() {
-  // ── Data state ────────────────────────────────────────────────────────────
-  const [weather, setWeather] = useState(null);       // Current conditions from OWM
-  const [tide, setTide] = useState(null);             // Tidal extremes from Stormglass
-  const [waveData, setWaveData] = useState(null);     // Current wave state from Open-Meteo Marine
-  const [forecast, setForecast] = useState([]);       // Hourly forecast with safety scores
+  // Data state
+  const [weather, setWeather] = useState(null);   
+  const [tide, setTide] = useState(null);             
+  const [waveData, setWaveData] = useState(null);
+  const [forecast, setForecast] = useState([]);      
 
-  // ── UI / search state ─────────────────────────────────────────────────────
+  // UI/search state
   const [city, setCity] = useState(() => localStorage.getItem("lastCity") || "London");
   const [error, setError] = useState("");
-  const [selectedArrival, setSelectedArrival] = useState(""); // Chosen slot in ArrivalChecker
+  const [selectedArrival, setSelectedArrival] = useState(""); 
     const [arrivalCity, setArrivalCity] = useState(
       () => localStorage.getItem("arrivalLastCity") || localStorage.getItem("lastCity") || "London"
     );
-    const [arrivalForecast, setArrivalForecast] = useState([]); // Forecast data used only by ArrivalChecker
+    const [arrivalForecast, setArrivalForecast] = useState([]); 
     const [arrivalLocation, setArrivalLocation] = useState("");
     const [arrivalError, setArrivalError] = useState("");
     const [arrivalIsFetching, setArrivalIsFetching] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date()); // Live clock updated every second
-  const [page, setPage] = useState("dashboard");              // Active page tab
+  const [currentTime, setCurrentTime] = useState(new Date()); 
+  const [page, setPage] = useState("dashboard");              
 
-  // ── History modal state ───────────────────────────────────────────────────
+  // History modal state 
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedCondition, setSelectedCondition] = useState("");
   const [conditionHistory, setConditionHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
-  const [historyCache, setHistoryCache] = useState({}); // In-memory cache to avoid re-fetching
+  const [historyCache, setHistoryCache] = useState({}); 
 
-  // ── Other modal flags ─────────────────────────────────────────────────────
+  // Other modal flags
   const [shareOpen, setShareOpen] = useState(false);
   const [shareExporting, setShareExporting] = useState(false);
   const [shareExportError, setShareExportError] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
 
-  // ── Connectivity & loading ────────────────────────────────────────────────
+  // Connectivity and loading
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [cachedWeather, setCachedWeather] = useState(null); // Last good weather snapshot for offline mode
   const [isFetching, setIsFetching] = useState(false);      // True while loadWeather is in progress
 
-  // ── Operational limits (harbour-master configurable) ──────────────────────
+  // Operational limits (harbour master configurable)
   // Initialised from defaults snapshot.
   const [windMaxInput, setWindMaxInput] = useState(initialLimit.windMax);
   const [visibilityMinInput, setVisibilityMinInput] = useState(initialLimit.visibilityMin);
   const [precipitationMaxInput, setPrecipitationMaxInput] = useState(initialLimit.precipitationMax);
   const [waveMaxInput, setWaveMaxInput] = useState(initialLimit.waveMax);
   
-  // Theme is read from localStorage on mount; falls back to the OS preference.
+  // Theme is read from localStorage on mount; falls back to OS preference.
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem("theme");
     if (saved === "light" || saved === "dark") return saved;
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
 
-  // Derive risk periods from the forecast on every render — no extra state needed.
+  // Gets risk periods from the forecast on every render.
   const riskPeriods = getDangerousPeriods(forecast);
 
-  // ── Refs ──────────────────────────────────────────────────────────────────
-  // latLonRef stores the most recent coordinates so callbacks that don't depend
-  // on weather state (timers, limit effects) can still trigger geo-based fetches.
-  const latLonRef = useRef({ lat: null, lon: null });
-  const dashboardCaptureRef = useRef(null);
+  // References
+  const latLonRef = useRef({ lat: null, lon: null }); // Stores most recent coordinates
+  const dashboardCaptureRef = useRef(null); 
 
-  // prevLimits tracks the last-applied limit values to avoid re-running the
-  // safety calculation when an unrelated state update re-renders the component.
-  const prevLimits = useRef({
+  const prevLimits = useRef({ // tracks last applied limit values to avoid unnecessary reruns
     windMaxInput, visibilityMinInput, precipitationMaxInput, waveMaxInput
   });
 
-  // ── One-time effects ──────────────────────────────────────────────────────
+  // One-time effects
 
-  // Show tutorial on first visit; set flag so it does not reappear.
+  // Shows tutorial on first visit, set flag so it does not reappear.
   useEffect(() => {
     if (!localStorage.getItem("tutorialSeen")) setTutorialOpen(true);
   }, []);
@@ -345,7 +313,7 @@ function App() {
     localStorage.setItem("tutorialSeen", "1");
   };
 
-  // Listen for browser online/offline events to switch between live and cached data.
+  // Check for browser online/offline events to switch between live and cached data.
   useEffect(() => {
     const goOnline  = () => setIsOffline(false);
     const goOffline = () => setIsOffline(true);
@@ -357,7 +325,7 @@ function App() {
     };
   }, []);
 
-  // Theme — fixes dark/light mode text colour issue by using CSS variables throughout
+  // fixes dark/light mode text colour issue by using CSS variables throughout
   useEffect(() => {
     document.documentElement.classList.remove("theme-light", "theme-dark");
     document.documentElement.classList.add(theme === "dark" ? "theme-dark" : "theme-light");
@@ -369,7 +337,7 @@ function App() {
     localStorage.setItem("lastCity", city);
   }, [city]);
 
-  // Keep the planning search independent from the navbar search.
+  // Keep the planning search independent from the navbar search
   useEffect(() => {
     localStorage.setItem("arrivalLastCity", arrivalCity);
   }, [arrivalCity]);
@@ -388,8 +356,8 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // When an operational limit changes, push the new value into safetyLogic and
-  // re-run the forecast so safety badges update instantly without a page reload.
+  // When operational limit changes, push the new value into safetyLogic and
+  // rerun the forecast so safety badges update instantly without a page reload.
   // prevLimits prevents this running on unrelated re-renders.
   useEffect(() => {
     const prev = prevLimits.current;
@@ -410,46 +378,44 @@ function App() {
         precipitationMaxInput: Number(precipitationMaxInput),
         waveMaxInput: Number(waveMaxInput),
       };
-      // Only re-fetch if coordinates are known (i.e. a city has already loaded).
+      // Only re-fetch if coordinates are known
       if (latLonRef.current.lat != null) loadForecast();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [windMaxInput, visibilityMinInput, precipitationMaxInput, waveMaxInput]);
 
-  // Increment the live clock every second for the navbar timestamp display.
+  // Increment the live clock every second for the navbar timestamp
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // ── Event handlers ────────────────────────────────────────────────────────
+  // Event handlers
 
-  /** Updates the city state when the user presses Enter in the search box. */
+  // Updates city when the user presses Enter in the search box //
   const handleCitySearch = (e) => {
     if (e.key === "Enter" && e.target.value.trim()) {
       setCity(e.target.value.trim());
     }
   };
 
-  /** Submits the planning panel's location search. */
+  // Submits the planning panel's location search //
   const handleArrivalCitySearch = (value) => {
     if (!value.trim()) return;
     setSelectedArrival("");
     setArrivalCity(value.trim());
   };
 
-  // ── Data loaders ──────────────────────────────────────────────────────────
+  // loads data
 
   /**
    * Fetches current weather from OpenWeatherMap for the active city.
-   * On success: normalises the response, runs a safety assessment (wave = null
-   *   at this stage because wave data arrives separately), and caches the result
-   *   in localStorage for offline use.
-   * On failure: falls back to cached data if available.
+   * On success, accepts response, runs a safety assessment and caches result in localstorage for offline use
+   *  
+   * On failure, falls back to cached data if available
    */
   const loadWeather = useCallback(async () => {
     if (isOffline) {
-      // Device is offline — serve whatever is in the cache rather than failing.
+      // Device is offline, display whatever is in the cache
       const cached = localStorage.getItem(`weather_${city}`);
       if (cached) setCachedWeather(JSON.parse(cached));
       return;
@@ -459,14 +425,14 @@ function App() {
       setError("");
       const data = await getWeather(city);
 
-      // Normalise units: OWM returns visibility in metres and wind in m/s.
+      // Converts units, API returns data in correct units
       const visibilityKm = data.visibility ? data.visibility / 1000 : 0;
       const windMs       = data.wind?.speed ?? 0;
       const windDeg      = data.wind?.deg   ?? null;
       const rain1h       = data.rain?.["1h"] ?? 0;
 
-      // Initial safety assessment without wave height — wave data loads separately
-      // via loadWaves() and will update this once coordinates are known.
+      // Initial safety assessment without wave height and wave data loads separately
+      // and will update this once coordinates are known.
       const safety = calculateSafetyStatus(windMs, visibilityKm, rain1h, null);
 
       const weatherData = {
@@ -488,14 +454,14 @@ function App() {
         updatedAt:         new Date().toLocaleString(),
         lat:               data.coord?.lat ?? null,
         lon:               data.coord?.lon ?? null,
-        waveHeight:        null, // populated later by loadWaves()
+        waveHeight:        null, // gotten later by loadWaves()
       };
 
-      // Store coords in the ref so timer-based reloads can still reach the marine APIs.
+      // Store coords in the ref so timer-based reloads can still reach the marine APIs
       latLonRef.current = { lat: weatherData.lat, lon: weatherData.lon };
       setWeather(weatherData);
       setCachedWeather(null);
-      // Persist to localStorage so the app works offline after the first load.
+      // Keeps in localStorage so the app works offline after first load
       localStorage.setItem(`weather_${city}`, JSON.stringify({ ...weatherData, cachedAt: Date.now() }));
     } catch (err) {
       console.error("Weather fetch error:", err);
@@ -509,10 +475,10 @@ function App() {
 
   /**
    * Fetches the hourly 24-hour forecast from Open-Meteo using the stored coordinates.
-   * Each slot is enriched with a safety status so the Forecast page and Risk Outlook
-   * can colour-code every hour independently.
+   * Each slot has safety status so the Forecast page and Risk Outlook
+   * can colour-code every hour independently
    * Uses latLonRef so it can be called from timers and the limits effect without
-   * needing weather state as a dependency.
+   * needing weather state as a dependency
    */
   const loadForecast = useCallback(async () => {
     const { lat, lon } = latLonRef.current;
@@ -521,7 +487,7 @@ function App() {
       const items = await getHourlyForecast(lat, lon);
       setForecast(
         items.map((item) => {
-          // Run safety assessment per slot — wave height is included when available.
+          // Run safety assessment per slot — wave height is included when available
           const slotSafety = calculateSafetyStatus(item.windMs, item.visibility, item.precipitation, item.waveHeight);
           return {
             ...item,
@@ -538,7 +504,7 @@ function App() {
     }
   }, [isOffline]);
 
-  // Loads forecast data for the planning panel's own city selection.
+  // Loads forecast data for the planning panel's own city selection
   const loadArrivalForecast = useCallback(async () => {
     if (isOffline) return;
     setArrivalIsFetching(true);
@@ -579,8 +545,8 @@ function App() {
 
   /**
    * Fetches the next 24 hours of tidal extremes from Stormglass.
-   * Wrapped in its own callback so the caller (lat/lon effect) can pass coordinates
-   * directly without reading from state, which avoids stale closure issues.
+   * Wrapped in its own callback so caller can pass coordinates
+   * directly without reading from state
    */
   const loadTide = useCallback(async (lat, lon) => {
     if (lat == null || lon == null || isOffline) return;
@@ -599,8 +565,6 @@ function App() {
       const data = await getWaveData(lat, lon);
       setWaveData(data);
       // Re-run safety assessment now that wave height is known.
-      // Uses the functional form of setWeather to always base the update on the
-      // latest state, avoiding a race condition with loadWeather.
       setWeather((prev) => {
         if (!prev) return prev;
         const safety = calculateSafetyStatus(prev.windMs, prev.visibility, prev.precipitation, data.waveHeight);
@@ -622,11 +586,8 @@ function App() {
     }
   }, [isOffline]);
 
-  // ── Lifecycle effects ─────────────────────────────────────────────────────
 
-  // When the city changes, clear all stale data and reload from scratch.
-  // Forecast is NOT triggered here — it loads via the lat/lon effect below
-  // once loadWeather completes and coordinates become known.
+  // When city changes, clear all data and reload from scratch
   useEffect(() => {
     latLonRef.current = { lat: null, lon: null };
     setTide(null);
@@ -641,18 +602,18 @@ function App() {
     loadWeather();
   }, [city, loadWeather]);
 
-  // Refresh planning-panel forecast when its local search location changes.
+  // Refresh planning-panel forecast when local search location changes
   useEffect(() => {
     loadArrivalForecast();
   }, [loadArrivalForecast]);
 
-  // Auto-refresh current conditions every 10 minutes.
+  // Auto-refresh current conditions every 10 minutes
   useEffect(() => {
     const i = setInterval(loadWeather, 10 * 60 * 1000);
     return () => clearInterval(i);
   }, [loadWeather]);
 
-  // Auto-refresh forecast every 30 minutes (less frequent — hourly data changes slowly).
+  // Auto-refresh forecast every 30 minutes (less frequent)
   useEffect(() => {
     const i = setInterval(() => {
       if (latLonRef.current.lat != null) loadForecast();
@@ -660,9 +621,9 @@ function App() {
     return () => clearInterval(i);
   }, [loadForecast]);
 
-  // Once coordinates are available (after loadWeather succeeds), trigger the
-  // geo-dependent loaders.  The dependency on weather?.lat means this re-runs
-  // automatically when the user searches a new city with different coordinates.
+  // Once coordinates are available, trigger the
+  // geo-dependent loaders. The dependency on weather?.lat means this re-runs
+  // automatically when user searches a new city with different coordinates.
   useEffect(() => {
     if (!weather || weather.lat == null) return;
     loadTide(weather.lat, weather.lon);
@@ -671,9 +632,9 @@ function App() {
   }, [weather?.lat, weather?.lon, loadTide, loadWaves, loadForecast]);
 
   /**
-   * Opens the history modal for a given condition and fetches its 24-hour data.
-   * Uses an in-memory cache (historyCache) to avoid re-fetching the same
-   * condition for the same location within a single session.
+   * Opens the history modal for a condition and fetches 24-hour data
+   * Uses in-memory cache to avoid re-fetching the same
+   * condition for the same location within a single session
    */
   const handleOpenHistory = async (conditionKey) => {
     const w = weather || cachedWeather;
@@ -682,7 +643,7 @@ function App() {
     setHistoryModalOpen(true);
     setHistoryError("");
 
-    // Return cached data immediately if available.
+    // Return cached data immediately if available
     const cacheKey = `${w.lat},${w.lon}:${conditionKey}`;
     if (historyCache[cacheKey]) {
       setConditionHistory(historyCache[cacheKey]);
@@ -860,7 +821,7 @@ function App() {
     );
   }
 
-  // Build metric cards — including wave height
+  // Build metric cards 
   const metricCards = [
     { key: "humidity", label: "Humidity", value: `${displayWeather.humidity}%` },
     { key: "visibility", label: "Visibility", value: `${displayWeather.visibility.toFixed(1)} km` },

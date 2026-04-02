@@ -1,25 +1,14 @@
 /**
- * openMeteoForecastAPI.js
- * Fetches a 24-hour hourly forecast by combining two Open-Meteo APIs:
- *   1. Forecast API  — atmospheric conditions (temperature, wind, precipitation, visibility)
- *   2. Marine API    — ocean conditions (wave height, direction, period)
- *
- * Both APIs are free, require no key, and accept lat/lon coordinates.
- * This replaced the OpenWeatherMap forecast (which only provides 3-hourly slots
- * on the free tier and has no wave data).
- *
- * The Marine API will fail for inland locations — this is handled gracefully
- * by setting wave fields to null rather than crashing the forecast.
+ * Open-Meteo forecast client.
+ * Merges atmospheric and marine hourly data for the next 24 hours.
  */
 
 import axios from "axios";
 
-// ── WMO weather code helpers ────────────────────────────────────────────────
+// WMO weather code helpers
 
 /**
- * Converts a WMO weather interpretation code to an OpenWeatherMap-compatible
- * icon code so the existing <img> tag in ForecastPanel can still use the
- * OWM CDN icon sprites without any additional changes.
+ * Converts WMO weather codes to OpenWeather-style icon IDs used by the UI.
  *
  * @param {number}  code  - WMO weather code (see https://open-meteo.com/en/docs).
  * @param {boolean} isDay - Whether the time slot is daytime (06:00–20:00).
@@ -40,8 +29,7 @@ function wmoToOwmIcon(code, isDay) {
 }
 
 /**
- * Converts a WMO weather code to a short human-readable description
- * shown on each forecast card.
+ * Converts a WMO weather code to a short card description.
  *
  * @param {number} code - WMO weather code.
  * @returns {string}
@@ -76,15 +64,9 @@ function wmoToDescription(code) {
   return map[code] ?? "unknown";
 }
 
-// ── Main export ──────────────────────────────────────────────────────────────
-
 /**
- * Fetches an hourly 24-hour forecast for a given location by merging
- * atmospheric and marine data from Open-Meteo.
- *
- * Both API calls are made concurrently with Promise.allSettled so that a
- * marine API failure (expected for inland cities) does not block the
- * atmospheric forecast from loading.
+ * Fetches hourly forecast slots and merges optional marine fields.
+ * Marine failures are tolerated so inland locations still return data.
  *
  * @param {number} lat - Latitude in decimal degrees.
  * @param {number} lon - Longitude in decimal degrees.
@@ -104,7 +86,7 @@ function wmoToDescription(code) {
  * @throws {Error} If the atmospheric forecast request fails.
  */
 export async function getHourlyForecast(lat, lon) {
-  // Fire both requests simultaneously — marine failure is non-fatal.
+  // Marine request is optional; weather request is required.
   const [weatherSettled, marineSettled] = await Promise.allSettled([
     axios.get(
       `https://api.open-meteo.com/v1/forecast` +
@@ -120,7 +102,7 @@ export async function getHourlyForecast(lat, lon) {
     ),
   ]);
 
-  // Atmospheric data is required — throw if it failed.
+  // Atmospheric data is required.
   if (weatherSettled.status === "rejected") {
     throw new Error("Failed to load hourly forecast.");
   }
@@ -130,7 +112,7 @@ export async function getHourlyForecast(lat, lon) {
     throw new Error(weatherData.reason || "Failed to load hourly forecast.");
   }
 
-  // Marine data is optional — null if unavailable (e.g. inland city).
+  // Marine data can be unavailable for inland locations.
   const marineData =
     marineSettled.status === "fulfilled" && !marineSettled.value.data?.error
       ? marineSettled.value.data
@@ -153,16 +135,16 @@ export async function getHourlyForecast(lat, lon) {
         windMs:        hourly.wind_speed_10m[i]      ?? 0,
         windDeg:       hourly.wind_direction_10m[i]  ?? null,
         precipitation: hourly.precipitation[i]        ?? 0,
-        visibility:   (hourly.visibility[i] ?? 10000) / 1000, // API returns metres → convert to km
+        visibility:   (hourly.visibility[i] ?? 10000) / 1000,
         icon:          wmoToOwmIcon(code, hour >= 6 && hour < 20),
         description:   wmoToDescription(code),
-        // Wave fields are null when the marine API was unavailable.
+        // Keep marine values nullable so callers can branch explicitly.
         waveHeight:    marineHourly?.wave_height?.[i]    ?? null,
         waveDirection: marineHourly?.wave_direction?.[i] ?? null,
         wavePeriod:    marineHourly?.wave_period?.[i]    ?? null,
-        _t: t, // internal timestamp used for filtering; not rendered
+        _t: t,
       };
     })
-    // Keep only slots in the next 24 hours (API returns 2 days).
+    // API returns 2 days; keep only the next 24 hours.
     .filter((item) => item._t > now && item._t <= cutoff);
 }

@@ -1,14 +1,6 @@
 /**
- * waveAPI.js
- * Fetches current wave conditions from the Open-Meteo Marine API.
- *
- * Open-Meteo is free and requires no API key.  The marine endpoint returns
- * data only for ocean/sea coordinates — requests for inland cities will
- * return an error, which callers should handle gracefully (wave fields → null).
- *
- * Wave height is the significant wave height (Hs), i.e. the average height
- * of the highest one-third of waves — the standard measure used in maritime
- * operations and pilotage directions.
+ * Open-Meteo marine client for current wave conditions.
+ * Inland coordinates may fail and are handled by callers.
  */
 
 import axios from "axios";
@@ -23,7 +15,7 @@ import axios from "axios";
  *   waveDirection: number|null, // Mean wave direction in degrees (0–360)
  *   wavePeriod: number|null     // Mean wave period in seconds
  * }>}
- * @throws {Error} If the API returns an error (e.g. inland location).
+ * @throws {Error} If the API returns an error 
  */
 export async function getWaveData(lat, lon) {
   if (lat == null || lon == null) throw new Error("Coordinates required for wave data.");
